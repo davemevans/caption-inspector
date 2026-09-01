@@ -230,7 +230,6 @@ const char* uint8toBitArray( uint8 byteToBits )
  -------------------------------------------------------------------------------*/
 void buildOutputPath(char* inputFilename, char* outputDir, char* extension, char* artifactPath ) {
     ASSERT(inputFilename);
-    ASSERT(outputDir);
     ASSERT(artifactPath);
     ASSERT(extension);
 
@@ -251,7 +250,7 @@ void buildOutputPath(char* inputFilename, char* outputDir, char* extension, char
     tmpCharPtr = strrchr(baseFilename, '.');
     if( tmpCharPtr != NULL ) *tmpCharPtr = '\0';
 
-    if( outputDir[0] == '\0' ) {
+    if( outputDir == NULL || outputDir[0] == '\0' ) {
         char tmpInputFilename[MAX_FILE_NAME_LEN];
         memcpy(tmpInputFilename, inputFilename, MAX_FILE_NAME_LEN);
         tmpInputFilename[MAX_FILE_NAME_LEN-1] = '\0';
@@ -263,8 +262,8 @@ void buildOutputPath(char* inputFilename, char* outputDir, char* extension, char
             sprintf(artifactPath, "%s/%s.%s", tmpInputFilename, baseFilename, extension);
         }
     } else {
-        if( outputDir[strlen(outputDir)-1] == '/') outputDir[strlen(outputDir)-1] = '\0';
-        sprintf(artifactPath, "%s/%s.%s", outputDir, baseFilename, extension );
+        char * seperator = (strlen(outputDir) && (outputDir[strlen(outputDir) - 1] == '/')) ? "" : "/";
+        sprintf(artifactPath, "%s%s%s.%s", outputDir, seperator, baseFilename, extension );
     }
 
     ASSERT(strlen(artifactPath) < MAX_FILE_NAME_LEN);
