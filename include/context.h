@@ -215,6 +215,7 @@ typedef struct {
     uint32 nextFrameNum;
     uint32 hourAdjust;
     uint32 sccFrameRate;
+    boolean sccDropframe;
 } SccEncodeCtx;
 
 /* Sinks */

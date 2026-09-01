@@ -73,6 +73,7 @@ uint8 byteFromNibbles( char, char );
 void byteToAscii( uint8, uint8*, uint8* );
 uint8 numCcConstructsFromFramerate( uint32 );
 uint8 cdpFramerateFromFramerate( uint32 );
+uint16 timeCodeRateToFrameRateTimesOneHundred( uint8, boolean );
 boolean isFramerateValid( uint32 frameRatePerSecTimesOneHundred );
 void frameToTimeCode( uint32, uint32, CaptionTime* );
 uint32 timeCodeToFrame( CaptionTime* );

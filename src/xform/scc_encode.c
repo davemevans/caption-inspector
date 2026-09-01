@@ -35,7 +35,7 @@
 /*--                     Private Member Declarations                        --*/
 /*----------------------------------------------------------------------------*/
 
-static Buffer* generateNewCcDataPacket( uint8, uint8, uint8, uint32, uint32 );
+static Buffer* generateNewCcDataPacket( uint8, uint8, uint8, uint32, uint32, boolean );
 
 /*----------------------------------------------------------------------------*/
 /*--                       Public Member Functions                          --*/
@@ -66,6 +66,7 @@ LinkInfo SccEncodeInitialize( Context* rootCtxPtr ) {
     ctxPtr->nextFrameNum = 0;
     ctxPtr->hourAdjust = 0;
     ctxPtr->sccFrameRate = 0;
+    ctxPtr->sccDropframe = FALSE;
 
     InitSinks(&ctxPtr->sinks, SCC_DATA___CC_DATA);
 
@@ -137,6 +138,7 @@ uint8 SccEncodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
     
     if( ctxPtr->nextFrameNum == 0 ) {
         ctxPtr->sccFrameRate = inBuffer->captionTime.frameRatePerSecTimesOneHundred;
+        ctxPtr->sccDropframe = inBuffer->captionTime.dropframe;
         if( inBuffer->captionTime.hour == 1 ) {
             ctxPtr->hourAdjust = 1;
             LOG(DEBUG_LEVEL_WARN, DBG_SCC_ENC, "First Caption 1 hour into film, normalizing.");
@@ -164,7 +166,7 @@ uint8 SccEncodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
     
     // Pad to Current Frame
     for( uint32 loop = ctxPtr->nextFrameNum; loop < frame; loop++ ) {
-        Buffer* outputBufPtr = generateNewCcDataPacket( CEA608_ZERO_WITH_ODD_PARITY, CEA608_ZERO_WITH_ODD_PARITY, ccCount, ctxPtr->nextFrameNum, ctxPtr->sccFrameRate );
+        Buffer* outputBufPtr = generateNewCcDataPacket( CEA608_ZERO_WITH_ODD_PARITY, CEA608_ZERO_WITH_ODD_PARITY, ccCount, ctxPtr->nextFrameNum, ctxPtr->sccFrameRate, ctxPtr->sccDropframe );
         LOG(DEBUG_LEVEL_VERBOSE, DBG_SCC_ENC, "SCC Encode: Passing %d bytes of pad at frame %d ", outputBufPtr->numElements, ctxPtr->nextFrameNum );
 
         if( PassToSinks(rootCtxPtr, outputBufPtr, &ctxPtr->sinks) == FALSE ) {
@@ -176,7 +178,7 @@ uint8 SccEncodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
     
     // Break up payload into multiple, contiguous frames
     for( int loop = 0; loop < (inBuffer->numElements / 2); loop++ ) {
-        Buffer* outputBufPtr = generateNewCcDataPacket( inBuffer->dataPtr[(loop*2)], inBuffer->dataPtr[((loop*2)+1)], ccCount, ctxPtr->nextFrameNum, ctxPtr->sccFrameRate );
+        Buffer* outputBufPtr = generateNewCcDataPacket( inBuffer->dataPtr[(loop*2)], inBuffer->dataPtr[((loop*2)+1)], ccCount, ctxPtr->nextFrameNum, ctxPtr->sccFrameRate, ctxPtr->sccDropframe );
         LOG(DEBUG_LEVEL_VERBOSE, DBG_SCC_ENC, "SCC Encode: Passing %d bytes of data {%02X, %02X} at frame %d ",
             outputBufPtr->numElements, inBuffer->dataPtr[(loop*2)], inBuffer->dataPtr[((loop*2)+1)], ctxPtr->nextFrameNum );
         
@@ -220,7 +222,7 @@ boolean SccEncodeShutdown( void* rootCtxPtr ) {
     uint8 ccCount = numCcConstructsFromFramerate(ctxPtr->sccFrameRate);
     
     Buffer* outputBufPtr = generateNewCcDataPacket( CEA608_ZERO_WITH_ODD_PARITY, CEA608_ZERO_WITH_ODD_PARITY, ccCount,
-                                                    ctxPtr->nextFrameNum, ctxPtr->sccFrameRate );
+                                                    ctxPtr->nextFrameNum, ctxPtr->sccFrameRate, ctxPtr->sccDropframe );
 
     free(ctxPtr);
     ((Context*)rootCtxPtr)->sccEncodeCtxPtr = NULL;
@@ -255,10 +257,12 @@ boolean SccEncodeShutdown( void* rootCtxPtr ) {
  |    This function allocates memory that will be freed once the data is converted
  |    to Base64 in the method: base64EncodeSeiPacket()
  -------------------------------------------------------------------------------*/
-static Buffer* generateNewCcDataPacket( uint8 firstByte, uint8 secondByte, uint8 ccCount, uint32 frameNum, uint32 frameRate ) {
-    
+static Buffer* generateNewCcDataPacket( uint8 firstByte, uint8 secondByte, uint8 ccCount, uint32 frameNum, uint32 frameRate, boolean dropframe ) {
+
     Buffer* outputBuffer = NewBuffer(BUFFER_TYPE_BYTES, (3 * ccCount));
     frameToTimeCode( frameNum, frameRate, &outputBuffer->captionTime );
+    // frameToTimeCode() does not carry the drop-frame flag, set it explicitly
+    outputBuffer->captionTime.dropframe = dropframe;
     outputBuffer->numElements = outputBuffer->maxNumElements;
     
     outputBuffer->dataPtr[0] = VALID_CEA608E_LINE21_FIELD_1_CC;

@@ -153,20 +153,27 @@ boolean MccFileInitialize( Context* rootCtxPtr, char* fileNameStr ) {
         } else if( strncmp(line, "Time Code Rate=", strlen("Time Code Rate=")) == 0 ) {
             char* tmpPtr = &line[(strlen("Time Code Rate="))];
             
-            ctxPtr->frameRateTimesOneHundred = (tmpPtr[0] - '0') * 1000;
-            ctxPtr->frameRateTimesOneHundred = ctxPtr->frameRateTimesOneHundred + ((tmpPtr[1] - '0') * 100);
-            
-            LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "Frame Rate: %d.%d", (ctxPtr->frameRateTimesOneHundred / 100), (ctxPtr->frameRateTimesOneHundred % 100) );
-            
+            uint8 baseRate = ((tmpPtr[0] - '0') * 10) + ((tmpPtr[1] - '0'));
+            boolean df = FALSE;
             if( (tmpPtr[2] == 'D') && (tmpPtr[3] == 'F') ) {
-                ctxPtr->isDropFrame = TRUE;
+                df = TRUE;
             }
+
+            ctxPtr->frameRateTimesOneHundred = timeCodeRateToFrameRateTimesOneHundred(baseRate, df);
+            ctxPtr->isDropFrame = df;
+
+            LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "Frame Rate: %d.%d", (ctxPtr->frameRateTimesOneHundred / 100), (ctxPtr->frameRateTimesOneHundred % 100) );
+
         } else {
             captionsStarted = TRUE;
             fseek(ctxPtr->captionsFilePtr,pos,0);
         }
     }
     
+    if( line ) {
+        free(line);
+    }
+
     return TRUE;
 }  // MccFileInitialize()
 
