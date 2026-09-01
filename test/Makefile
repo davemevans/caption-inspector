@@ -114,12 +114,12 @@ OBJS_WITH_PATH = $(SRC_OBJS_WITH_PATH) $(XFORM_OBJS_WITH_PATH) $(SINK_OBJS_WITH_
 OBJS_IN_OBJ_DIR = $(foreach OBJS, $(OBJS), ../obj/$(OBJS))
 
 ifeq ($(UNAME), Linux)
-C_FLAGS = -Wpedantic -Wno-deprecated-declarations -Wall -fno-strict-aliasing -fPIC -DPIC -DCOMPILE_GPAC
-SO_FLAGS = -shared -W -L/usr/local/lib -lavformat -lavcodec -lavutil -luuid -lgpac
+C_FLAGS = -Wpedantic -Wno-deprecated-declarations -Wall -fno-strict-aliasing -fPIC -DPIC -DCOMPILE_GPAC -I/usr/local/include
+SO_FLAGS = -shared -W
 LD_FLAGS = -L/usr/local/lib -lavformat -lavcodec -lavutil -luuid -lm -lgpac
 else
-C_FLAGS = -Wpedantic -Wno-deprecated-declarations -DCOMPILE_GPAC
-SO_FLAGS = -dynamiclib -undefined suppress -flat_namespace -L/usr/local/lib -lavformat -lavcodec -lavutil -lgpac
+C_FLAGS = -Wpedantic -Wno-deprecated-declarations -DCOMPILE_GPAC -I/usr/local/include
+SO_FLAGS = -dynamiclib
 LD_FLAGS = -L/usr/local/lib -lavformat -lavcodec -lavutil -lz -lgpac
 endif
 
@@ -170,7 +170,7 @@ all: ${PYTEST_SHARED_LIB} $(UNIT_TESTS) $(INTEG_TESTS)
 
 ${PYTEST_SHARED_LIB}: $(OBJS_WITH_PATH) $(PYTEST_OBJS_WITH_PATH)
 	@echo "\n*** Compiling Caption Inspector Test Dynamic Library to interface with Python Test Drivers. ***"
-	gcc $(SO_FLAGS) -o python/${PYTEST_SHARED_LIB} $(OBJS_IN_OBJ_DIR) ${PYTEST_OBJS_IN_OBJ_DIR}
+	gcc $(SO_FLAGS) -o python/${PYTEST_SHARED_LIB} $(OBJS_IN_OBJ_DIR) ${PYTEST_OBJS_IN_OBJ_DIR} $(LD_FLAGS)
 
 ${ITEST_PIPELINE_UTILS_EXE}: ${ITEST_PIPELINE_UTILS_WITH_PATH} ${TEST_OBJS_WITH_PATH}
 	gcc -o ${ITEST_PIPELINE_UTILS_EXE} ${ITEST_PIPELINE_UTILS_IN_OBJ_DIR} ${TEST_OBJS_IN_OBJ_DIR}
