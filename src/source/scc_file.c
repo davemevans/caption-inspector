@@ -245,6 +245,26 @@ uint8 SccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
         } else if( read < 5 ) {
             free(line);
             line = NULL;
+        } else {
+            // getline returns line terminators which we don't want
+            if (line[read - 1] == '\n') {
+                line[read - 1] = '\0';
+                read--;
+            }
+
+            // also strip carriage return (\r) if it exists (Windows)
+            if (line[read - 1] == '\r') {
+                line[read - 1] = '\0';
+                read--;
+            }
+
+            // a timecode with no caption data after it has nothing to decode
+            char* tabPtr = strchr(line, '\t');
+            if( (tabPtr == NULL) || (tabPtr[strspn(tabPtr, "\t ")] == '\0') ) {
+                LOG(DEBUG_LEVEL_WARN, DBG_FILE_IN, "Skipping SCC line without caption data: '%s'", line);
+                free(line);
+                line = NULL;
+            }
         }
     }
 
