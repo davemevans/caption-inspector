@@ -17,7 +17,8 @@ py_test_suites_names = {'autodetect_file': 'Test Suite: Autodetect File',
                         'output_utils': 'Test Suite: Output Utilities'}
 c_integ_test_suites = ['itest__buffer_utils', 'itest__pipeline_utils']
 c_unit_test_suites = ['utest__buffer_utils_c', 'utest__cc_utils_c', 'utest__external_adaptor_c',
-                      'utest__output_utils_c', 'utest__pipeline_utils_c']
+                      'utest__output_utils_c', 'utest__pipeline_utils_c', 'utest__types_c',
+                      'utest__cc_data_output_c', 'utest__mcc_decode_c']
 
 
 def run_test(test_name):
