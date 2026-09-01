@@ -284,6 +284,37 @@ uint8 CcDataOutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
         }
     }
 
+    // not all frame rates give multiples of five elements - flush remainder
+    if( lineOut.numElements > 0 ) {
+        if( printNewline == TRUE ) {
+            writeToFile(ctxPtr->fp, "\n              ");
+        }
+        for( int iloop = 0; iloop < NUM_CC_DATA_ELEMENTS_PER_LINE; iloop++ ) {
+            if( iloop < lineOut.numElements ) {
+                writeToFile(ctxPtr->fp, "%s  ", lineOut.element[iloop].hexStr);
+            } else {
+                writeToFile(ctxPtr->fp, "%*s", CC_DATA_ELEMENT_HEX_STR_PADDING_SIZE, "");
+            }
+        }
+        writeToFile(ctxPtr->fp, "  ");
+        for( int iloop = 0; iloop < NUM_CC_DATA_ELEMENTS_PER_LINE; iloop++ ) {
+            if( iloop < lineOut.numElements ) {
+                writeToFile(ctxPtr->fp, "%s  ", lineOut.element[iloop].tagStr);
+            } else {
+                writeToFile(ctxPtr->fp, "%*s", CC_DATA_ELEMENT_TAG_STR_PADDING_SIZE, "");
+            }
+        }
+        writeToFile(ctxPtr->fp, "  ");
+        for( int iloop = 0; iloop < NUM_CC_DATA_ELEMENTS_PER_LINE; iloop++ ) {
+            if( iloop < lineOut.numElements ) {
+                writeToFile(ctxPtr->fp, "%s  ", lineOut.element[iloop].decStr);
+            } else {
+                writeToFile(ctxPtr->fp, "%*s", CC_DATA_ELEMENT_DEC_STR_PADDING_SIZE, "");
+            }
+        }
+        lineOut.numElements = 0;
+    }
+
     boolean anyTextWritten = FALSE;
     for( int loop = 0; loop < NUM_608_CHANNELS; loop++ ) {
         if( strlen(lineOut.txtStr.txtStr608[loop]) > 0 ) {
@@ -312,7 +343,6 @@ uint8 CcDataOutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
         errorStr[0] = '\0';
     }
 
-    ASSERT(lineOut.numElements == 0 );
     writeToFile(ctxPtr->fp, "\n\n");
 
     FreeBuffer(buffPtr);

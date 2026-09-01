@@ -33,9 +33,12 @@
 #define CC_DATA_TYPE__PACKET_START                               3
 
 #define CC_DATA_ELEMENT_HEX_STR_SIZE                            10
+#define CC_DATA_ELEMENT_HEX_STR_PADDING_SIZE                     9
 #define CC_DATA_ELEMENT_TAG_STR_SIZE                            10
+#define CC_DATA_ELEMENT_TAG_STR_PADDING_SIZE                    11
 #define CC_DATA_ELEMENT_HALF_TAG_STR_SIZE                        5
 #define CC_DATA_ELEMENT_DEC_STR_SIZE                            18
+#define CC_DATA_ELEMENT_DEC_STR_PADDING_SIZE                    19
 #define CC_DATA_ELEMENT_HALF_DEC_STR_SIZE                        9
 
 #define NUM_CC_DATA_ELEMENTS_PER_LINE                            5
