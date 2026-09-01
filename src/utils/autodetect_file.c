@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <string.h>
 #include <limits.h>
+#include <sys/wait.h>
 #include <zconf.h>
 
 #include "debug.h"
@@ -49,7 +50,9 @@ const char* captionFileTypeStr[MAX_FILE_TYPE] = {
 /*--                      Private Member Variables                          --*/
 /*----------------------------------------------------------------------------*/
 
-char* mediaInfoInvokeStr = "/usr/local/bin/mediainfo";
+// Resolve mediainfo via the PATH rather than a hardcoded location, so it works
+// wherever MediaInfo is installed (e.g. /usr/bin, /usr/local/bin, /opt/homebrew/bin).
+char* mediaInfoInvokeStr = "mediainfo";
 char* mediaInfoVerStr = "--Version";
 char* mediaInfoFullStr = "-full";
 char* dropframeTagStr = "Time code of first frame";
@@ -136,19 +139,23 @@ boolean DetermineDropFrame( char* fileNameStr, boolean saveMediaInfo, char* outp
 
     while( fgets(buffer, sizeof(buffer)-1, filePtr) != NULL ) {
         if( strncmp(buffer, dropframeTagStr, strlen(dropframeTagStr)) == 0 ) {
-            char* tmpCharPtr;
-            tmpCharPtr = strchr(buffer, ':');
-            tmpCharPtr = tmpCharPtr+2;
-            if( tmpCharPtr[8] == ';' ) {
-                dfFound = TRUE;
-                isDropFrame = TRUE;
-                LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "File: %s is determined to be dropframe", fileNameStr );
-            } else if( tmpCharPtr[8] == ':' ) {
-                dfFound = TRUE;
-                isDropFrame = FALSE;
-                LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "File: %s is determined to be non-dropframe", fileNameStr );
+            // Expecting "<tag> : HH:MM:SS;FF" (';' = dropframe) or ":FF" (non-dropframe).
+            char* tmpCharPtr = strchr(buffer, ':');
+            if( (tmpCharPtr != NULL) && (strlen(tmpCharPtr + 2) > 8) ) {
+                tmpCharPtr = tmpCharPtr + 2;
+                if( tmpCharPtr[8] == ';' ) {
+                    dfFound = TRUE;
+                    isDropFrame = TRUE;
+                    LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "File: %s is determined to be dropframe", fileNameStr );
+                } else if( tmpCharPtr[8] == ':' ) {
+                    dfFound = TRUE;
+                    isDropFrame = FALSE;
+                    LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "File: %s is determined to be non-dropframe", fileNameStr );
+                } else {
+                    LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Unable to determine DropFrame: %s %s", tmpCharPtr, buffer );
+                }
             } else {
-                LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Unable to determine DropFrame: %s %s", tmpCharPtr, buffer );
+                LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Unexpected Time Code format from MediaInfo: %s", buffer );
             }
         }
         if( saveMediaInfo == TRUE ) {
@@ -156,11 +163,21 @@ boolean DetermineDropFrame( char* fileNameStr, boolean saveMediaInfo, char* outp
             writeToFile(outFilePtr, buffer);
         }
     }
-    pclose(filePtr);
+    int mediaInfoStatus = pclose(filePtr);
 
     if( saveMediaInfo == TRUE ) {
         ASSERT(outFilePtr);
         closeFile(outFilePtr);
+    }
+
+    // popen() returns a valid stream even when the command cannot be found (the
+    // shell runs and exits 127), so a missing/failed mediainfo would otherwise be
+    // silently indistinguishable from "not dropframe". Surface it loudly instead.
+    if( (mediaInfoStatus == -1) || !WIFEXITED(mediaInfoStatus) || (WEXITSTATUS(mediaInfoStatus) != 0) ) {
+        int exitCode = (mediaInfoStatus == -1) ? -1 : WEXITSTATUS(mediaInfoStatus);
+        LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Unable to run '%s' (exit %d) - cannot determine DropFrame for %s. Is MediaInfo installed and on the PATH?",
+            mediaInfoInvokeStr, exitCode, fileNameStr);
+        return FALSE;
     }
 
     if( dfFound == TRUE ) {
@@ -276,11 +293,15 @@ FileType DetermineFileType( char* fileNameStr ) {
             if( wasSuccessful == FALSE ) {
                 LOG(DEBUG_LEVEL_WARN, DBG_FILE_IN, "Unable to parse timecode on line: %s", line);
                 fclose(filePtr);
+                free(line);
                 return UNK_CAPTIONS_FILE;
             }
         }
     }
 
+    if( line ) {
+        free(line);
+    }
     fclose(filePtr);
 
     LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "Caption Window for File: %s --- %02d:%02d:%02d;%02d to %02d:%02d:%02d;%02d ", fileNameStr,

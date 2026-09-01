@@ -47,42 +47,34 @@ class TestClass(object):
 
     def test__Determine_DF_NDF(self):
         clib = ctypes.CDLL(CAPTION_INSPECTOR_LIBRARY)
-        is_drop_frame = ctypes.c_ubyte(0)
-        successful = clib.DetermineDropFrame("../media/BigBuckBunny_160x90-24fps.mpg".encode('utf-8'), 0,
-                                             0, ctypes.byref(is_drop_frame))
-        assert successful is 1
-        assert is_drop_frame.value is 0
+        is_drop_frame = clib.DetermineDropFrame("../media/BigBuckBunny_160x90-24fps.mpg".encode('utf-8'), 0, 0)
+        assert is_drop_frame == 0
 
     def test__Determine_DF_IDF(self):
         clib = ctypes.CDLL(CAPTION_INSPECTOR_LIBRARY)
-        is_drop_frame = ctypes.c_ubyte(0)
-        successful = clib.DetermineDropFrame("../media/BigBuckBunny_160x90-24fps.mov".encode('utf-8'), 0,
-                                             0, ctypes.byref(is_drop_frame))
-        assert successful is 0
-        successful = clib.DetermineDropFrame("../media/BigBuckBunny_256x144-24fps.ts".encode('utf-8'), 0,
-                                             0, ctypes.byref(is_drop_frame))
-        assert successful is 0
+        is_drop_frame = clib.DetermineDropFrame("../media/BigBuckBunny_160x90-24fps.mov".encode('utf-8'), 0, 0)
+        assert is_drop_frame == 0
+        is_drop_frame = clib.DetermineDropFrame("../media/BigBuckBunny_256x144-24fps.ts".encode('utf-8'), 0, 0)
+        assert is_drop_frame == 1
 
     def test__Determine_DF_Report(self):
         clib = ctypes.CDLL(CAPTION_INSPECTOR_LIBRARY)
-        is_drop_frame = ctypes.c_ubyte(0)
-        successful = clib.DetermineDropFrame("../media/BigBuckBunny_160x90-24fps.mpg".encode('utf-8'), 1,
-                                             "./BigBuck".encode('utf-8'), ctypes.byref(is_drop_frame))
-        assert os.path.isfile("./BigBuck.inf") is True
-        assert successful is 1
-        assert is_drop_frame.value is 0
-        if os.path.isfile("./BigBuck.inf"):
-            os.remove("./BigBuck.inf")
-            assert os.path.isfile("./BigBuck.inf") is False
+        if os.path.exists("./tmp") is not True:
+            os.mkdir("tmp")
+        is_drop_frame = clib.DetermineDropFrame(f"../media/BigBuckBunny_160x90-24fps.mpg".encode('utf-8'), 1,
+                                             './tmp'.encode('utf-8'))
+        assert os.path.isfile(f"./tmp/BigBuckBunny_160x90-24fps.inf") is True
+        assert is_drop_frame == 0
+        if os.path.isfile(f"./tmp/BigBuckBunny_160x90-24fps.inf"):
+            os.remove(f"./tmp/BigBuckBunny_160x90-24fps.inf")
+            assert os.path.isfile(f"./tmp/BigBuckBunny_160x90-24fps.inf") is False
+        os.removedirs("./tmp")
 
     def test__Determine_DF_Report_NULL(self):
         clib = ctypes.CDLL(CAPTION_INSPECTOR_LIBRARY)
-        is_drop_frame = ctypes.c_ubyte(0)
-        successful = clib.DetermineDropFrame("../media/BigBuckBunny_160x90-24fps.mpg".encode('utf-8'), 1,
-                                             0, ctypes.byref(is_drop_frame))
+        is_drop_frame = clib.DetermineDropFrame("../media/BigBuckBunny_160x90-24fps.mpg".encode('utf-8'), 1, 0)
         assert os.path.isfile("../media/BigBuckBunny_160x90-24fps.inf") is True
-        assert successful is 1
-        assert is_drop_frame.value is 0
+        assert is_drop_frame == 0
         if os.path.isfile("../media/BigBuckBunny_160x90-24fps.inf"):
             os.remove("../media/BigBuckBunny_160x90-24fps.inf")
             assert os.path.isfile("../media/BigBuckBunny_160x90-24fps.inf") is False
