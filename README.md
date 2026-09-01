@@ -124,6 +124,17 @@ cd test
 make test
 ```
 
+The local test build omits MOV/MP4 (GPAC) support by default, so it builds without any extra dependencies. If you have
+built and installed the GPAC caption extractor (see [Building ... with MOV Support](#building-the-caption-inspector-executable-locally-with-mov-support)
+above, whose `make install` places it under `/usr/local`), you can include it in the test build:
+
+```
+cd test
+make test WITH_GPAC=1
+```
+
+The Docker test build (`make docker-test`) always includes GPAC.
+
 The tests are a mix of C and Python, depending on which made more sense for the specific test. The build system will
 aggregate all of the results from the tests in both languages.
 

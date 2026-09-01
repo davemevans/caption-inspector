@@ -113,14 +113,36 @@ OBJS = $(SRC_OBJS) $(XFORM_OBJS) $(SINK_OBJS) $(UTIL_OBJS)
 OBJS_WITH_PATH = $(SRC_OBJS_WITH_PATH) $(XFORM_OBJS_WITH_PATH) $(SINK_OBJS_WITH_PATH) $(UTIL_OBJS_WITH_PATH)
 OBJS_IN_OBJ_DIR = $(foreach OBJS, $(OBJS), ../obj/$(OBJS))
 
+# GPAC (Comcast/gpac-caption-extractor) adds .mov/MP4 caption support. It is
+# optional and OFF by default so the suite builds and runs without it. When
+# enabled it is used from /usr/local, where gpac-caption-extractor's
+# `make install` puts it (see the README), matching src/Makefile's
+# ci_with_gpac. Enable it with WITH_GPAC=1, e.g. `make test WITH_GPAC=1`.
+# Docker builds with GPAC automatically via the Linux branch below.
+WITH_GPAC ?=
+
 ifeq ($(UNAME), Linux)
 C_FLAGS = -Wpedantic -Wno-deprecated-declarations -Wall -fno-strict-aliasing -fPIC -DPIC -DCOMPILE_GPAC -I/usr/local/include
 SO_FLAGS = -shared -W
 LD_FLAGS = -L/usr/local/lib -lavformat -lavcodec -lavutil -luuid -lm -lgpac
 else
-C_FLAGS = -Wpedantic -Wno-deprecated-declarations -DCOMPILE_GPAC -I/usr/local/include
+# Locate FFmpeg via pkg-config; Homebrew's prefix is not /usr/local on Apple Silicon.
+FFMPEG_PKGS := libavformat libavcodec libavutil
+ifneq ($(shell pkg-config --exists $(FFMPEG_PKGS) && echo yes),yes)
+$(error FFmpeg not found via pkg-config; install it (e.g. 'brew install ffmpeg pkg-config') or set PKG_CONFIG_PATH)
+endif
+FFMPEG_CFLAGS := $(shell pkg-config --cflags $(FFMPEG_PKGS))
+FFMPEG_LIBS := $(shell pkg-config --libs $(FFMPEG_PKGS))
+ifeq ($(WITH_GPAC),)
+GPAC_CFLAGS :=
+GPAC_LIBS :=
+else
+GPAC_CFLAGS := -DCOMPILE_GPAC -I/usr/local/include
+GPAC_LIBS := -L/usr/local/lib -lgpac
+endif
+C_FLAGS = -Wpedantic -Wno-deprecated-declarations $(FFMPEG_CFLAGS) $(GPAC_CFLAGS)
 SO_FLAGS = -dynamiclib
-LD_FLAGS = -L/usr/local/lib -lavformat -lavcodec -lavutil -lz -lgpac
+LD_FLAGS = -lz $(FFMPEG_LIBS) $(GPAC_LIBS)
 endif
 
 -include ../obj/$(OBJS:.o=.d)
@@ -225,7 +247,7 @@ test:
 	cd ../; make clean
 	@echo "\n*** Building for Test ***"
 	make all
-	cd ../; make ci_with_gpac
+	cd ../; if [ -n "$(WITH_GPAC)" ]; then make ci_with_gpac; else make; fi
 	@echo "\n*** Running Tests ***"
 	cd python; python3 test_engine.py
 
