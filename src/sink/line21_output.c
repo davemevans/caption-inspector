@@ -112,7 +112,6 @@ static void writeLine21codeToText( Line21OutputCtx*, Line21Code, CaptionTime* );
 LinkInfo Line21OutInitialize( Context* ctxPtr ) {
     ASSERT(ctxPtr);
     ASSERT(!ctxPtr->line21OutputCtxPtr);
-    char tempFilename[MAX_FILE_NAME_LEN];
 
     ctxPtr->line21OutputCtxPtr = malloc(sizeof(Line21OutputCtx));
     for( int loop = 0; loop < LINE21_MAX_NUM_CHANNELS; loop++ ) {
