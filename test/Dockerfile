@@ -36,4 +36,4 @@ RUN git clone https://github.com/Comcast/gpac-caption-extractor.git && \
 WORKDIR /app
 RUN mkdir caption-inspector
 
-ENTRYPOINT /usr/bin/make -C /app/caption-inspector/test docker-test
+ENTRYPOINT ["/usr/bin/make", "-C", "/app/caption-inspector/test", "docker-test"]
