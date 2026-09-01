@@ -103,12 +103,23 @@ boolean SccFileInitialize( Context* rootCtxPtr, char* fileNameStr, uint32 frTime
     while( captionsStarted == FALSE ) {
         pos = ftell(ctxPtr->captionsFilePtr);
         read = getline(&line, &len, ctxPtr->captionsFilePtr);
-        
+
+        if( read == -1 ) {
+            // End of file reached while still parsing header
+            LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Reached end of file parsing header; no caption data found");
+            fclose(ctxPtr->captionsFilePtr);
+            free(ctxPtr);
+            free(line);
+            rootCtxPtr->sccFileCtxPtr = NULL;
+            return FALSE;
+        }
+
         if( strncmp(line, "Scenarist_SCC V1.0", strlen("Scenarist_SCC V1.0")) == 0 ) {
             if( ctxPtr->frameRateTimesOneHundred == 0 ) {
                 LOG(DEBUG_LEVEL_FATAL, DBG_FILE_IN, "SCC File discovered with no Frame Rate Specified.");
                 fclose(ctxPtr->captionsFilePtr);
                 free(ctxPtr);
+                free(line);
                 rootCtxPtr->sccFileCtxPtr = NULL;
                 return FALSE;
             }
@@ -116,18 +127,21 @@ boolean SccFileInitialize( Context* rootCtxPtr, char* fileNameStr, uint32 frTime
             LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Spurious line from an MCC File");
             fclose(ctxPtr->captionsFilePtr);
             free(ctxPtr);
+            free(line);
             rootCtxPtr->sccFileCtxPtr = NULL;
             return FALSE;
         } else if( strncmp(line, "0 PREFIX 39", strlen("0 PREFIX 39")) == 0 ) {
             LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Spurious line from an encoded SEI File");
             fclose(ctxPtr->captionsFilePtr);
             free(ctxPtr);
+            free(line);
             rootCtxPtr->sccFileCtxPtr = NULL;
             return FALSE;
         } else if( strncmp(line, "File Format=Comcast CC Data File", strlen("File Format=Comcast CC Data File")) == 0 ) {
             LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Spurious line from a CC Data File");
             fclose(ctxPtr->captionsFilePtr);
             free(ctxPtr);
+            free(line);
             rootCtxPtr->sccFileCtxPtr = NULL;
             return FALSE;
         } else if( (strncmp(line, "//", 2) == 0) || (read < 5) ) {
@@ -146,6 +160,10 @@ boolean SccFileInitialize( Context* rootCtxPtr, char* fileNameStr, uint32 frTime
             captionsStarted = TRUE;
             fseek(ctxPtr->captionsFilePtr,pos,0);
         }
+    }
+
+    if( line ) {
+        free(line);
     }
     
     return TRUE;
@@ -221,9 +239,11 @@ uint8 SccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
             Sinks sinks = ctxPtr->sinks;
             free(ctxPtr);
             ctxPtr = NULL;
+            free(line);
             *isDonePtr = TRUE;
             return ShutdownSinks(rootCtxPtr, &sinks);
         } else if( read < 5 ) {
+            free(line);
             line = NULL;
         }
     }
@@ -257,6 +277,11 @@ uint8 SccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
             LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Unable to parse SCC Values %c %c - %s", wordPtr[2], wordPtr[3], wordPtr );
         }
         wordPtr = strtok(NULL, " ");
+    }
+
+    if( line ) {
+        free(line);
+        line = NULL;
     }
 
     ctxPtr->numCaptionsLinesRead = ctxPtr->numCaptionsLinesRead + 1;
