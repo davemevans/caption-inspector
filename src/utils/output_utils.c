@@ -230,7 +230,6 @@ const char* uint8toBitArray( uint8 byteToBits )
  -------------------------------------------------------------------------------*/
 void buildOutputPath(char* inputFilename, char* outputDir, char* extension, char* artifactPath ) {
     ASSERT(inputFilename);
-    ASSERT(outputDir);
     ASSERT(artifactPath);
     ASSERT(extension);
 
@@ -251,23 +250,24 @@ void buildOutputPath(char* inputFilename, char* outputDir, char* extension, char
     tmpCharPtr = strrchr(baseFilename, '.');
     if( tmpCharPtr != NULL ) *tmpCharPtr = '\0';
 
-    if( outputDir[0] == '\0' ) {
-        char tmpInputFilename[MAX_FILE_NAME_LEN];
-        memcpy(tmpInputFilename, inputFilename, MAX_FILE_NAME_LEN);
-        tmpInputFilename[MAX_FILE_NAME_LEN-1] = '\0';
-        tmpCharPtr = strrchr(tmpInputFilename, '/');
+    // artifactPath is MAX_FILE_NAME_LEN bytes; a path that does not fit is truncated and reported.
+    int len;
+    if( outputDir == NULL || outputDir[0] == '\0' ) {
+        tmpCharPtr = strrchr(inputFilename, '/');
         if( tmpCharPtr == NULL ) {
-            sprintf(artifactPath, "%s.%s", baseFilename, extension);
+            len = snprintf(artifactPath, MAX_FILE_NAME_LEN, "%s.%s", baseFilename, extension);
         } else {
-            *tmpCharPtr = '\0';
-            sprintf(artifactPath, "%s/%s.%s", tmpInputFilename, baseFilename, extension);
+            len = snprintf(artifactPath, MAX_FILE_NAME_LEN, "%.*s/%s.%s", (int)(tmpCharPtr - inputFilename),
+                           inputFilename, baseFilename, extension);
         }
     } else {
-        if( outputDir[strlen(outputDir)-1] == '/') outputDir[strlen(outputDir)-1] = '\0';
-        sprintf(artifactPath, "%s/%s.%s", outputDir, baseFilename, extension );
+        char * seperator = (strlen(outputDir) && (outputDir[strlen(outputDir) - 1] == '/')) ? "" : "/";
+        len = snprintf(artifactPath, MAX_FILE_NAME_LEN, "%s%s%s.%s", outputDir, seperator, baseFilename, extension );
     }
 
-    ASSERT(strlen(artifactPath) < MAX_FILE_NAME_LEN);
+    if( (len < 0) || (len >= MAX_FILE_NAME_LEN) ) {
+        LOG(DEBUG_LEVEL_ERROR, DBG_GENERAL, "Output path too long, truncated: %s", artifactPath);
+    }
 }  // buildOutputPath()
 
 /*----------------------------------------------------------------------------*/
