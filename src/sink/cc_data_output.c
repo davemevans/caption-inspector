@@ -48,8 +48,10 @@ static const char* ccTypeStr[4] = { "1", "2", "D", "S" };
 static uint16 add708Error( CcDataOutputCtx*, char* );
 static void appendText( char *, const char* );
 static void decode608Pair( CcDataOutputCtx*, uint8, uint8, uint8, CcdElemOut*, TextString* );
-static void decodePacketStart( CcDataOutputCtx*, uint8, uint8, CcdElemOut* );
+static void decodePacketStart( CcDataOutputCtx*, uint8, char*, char*, char* );
 static void decodePacketData( CcDataOutputCtx*, uint8, char*, char*, TextString*, char* );
+static void decodeServiceBlockHeader( CcDataOutputCtx*, uint8, char* tagStr, char* decStr, char* errStr );
+static void decodeServiceBlockHeaderExtension( CcDataOutputCtx*, uint8, char* tagStr, char* decStr, char* errStr );
 static void decodeC0CmdCode( CcDataOutputCtx*, uint8, char*, char*, char* );
 static void decodeC1CmdCode( CcDataOutputCtx*, uint8, char*, char*, char* );
 static void decodeExtCmdCode( CcDataOutputCtx*, uint8, char*, char*, TextString*, char* );
@@ -89,6 +91,8 @@ LinkInfo CcDataOutInitialize( Context* rootCtxPtr ) {
     ctxPtr->cea708State = CEA708_STATE_UNKNOWN;
     ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
     ctxPtr->cea708BytesRemaining = 0;
+    ctxPtr->cea708PacketBytesRemaining = 0;
+    ctxPtr->cea708BlockBytesRemaining = 0;
     buildOutputPath(rootCtxPtr->config.inputFilename, rootCtxPtr->config.outputDirectory, "ccd", ctxPtr->ccdFileName);
 
     LinkInfo linkInfo;
@@ -235,7 +239,12 @@ uint8 CcDataOutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
                     lineOut.numElements = lineOut.numElements + 1;
                     break;
                 case CC_DATA_TYPE__PACKET_START:
-                    decodePacketStart( ctxPtr, ccData1, ccData2, &lineOut.element[lineOut.numElements] );
+                    decodePacketStart( ctxPtr, ccData1, lineOut.element[lineOut.numElements].tagStr,
+                                       lineOut.element[lineOut.numElements].decStr, errorStr );
+                    lineOut.element[lineOut.numElements].tagStr[(CC_DATA_ELEMENT_TAG_STR_SIZE/2)-1] = '|';
+                    lineOut.element[lineOut.numElements].decStr[(CC_DATA_ELEMENT_DEC_STR_SIZE/2)-1] = '|';
+                    decodePacketData( ctxPtr, ccData2, &lineOut.element[lineOut.numElements].tagStr[CC_DATA_ELEMENT_TAG_STR_SIZE/2],
+                                      &lineOut.element[lineOut.numElements].decStr[(CC_DATA_ELEMENT_DEC_STR_SIZE/2)], &lineOut.txtStr, errorStr);
                     lineOut.numElements = lineOut.numElements + 1;
                     break;
                 case CC_DATA_TYPE__PACKET_DATA:
@@ -904,8 +913,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
  | DESCRIPTION:
  |    This function decodes a CEA-708 Packet Start
  -------------------------------------------------------------------------------*/
-static void decodePacketStart( CcDataOutputCtx* ctxPtr, uint8 ccData1, uint8 ccData2, CcdElemOut* outputPtr ) {
-    ASSERT(outputPtr);
+static void decodePacketStart( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagStr, char* decStr, char* errStr ) {
     int len;
 
 /*+-------------------------------------------------------------------------+----+
@@ -920,8 +928,8 @@ static void decodePacketStart( CcDataOutputCtx* ctxPtr, uint8 ccData1, uint8 ccD
   | }                                                                       |    |
   +-------------------------------------------------------------------------+----+*/
 
-    uint8 seqNum = (ccData1 & PACKET_SEQ_NUM_MASK) >> PACKET_SEQ_SHIFT;
-    uint8 pktSizeCode = ccData1 & PACKET_LENGTH_MASK;
+    uint8 seqNum = (ccData & PACKET_SEQ_NUM_MASK) >> PACKET_SEQ_SHIFT;
+    uint8 pktSizeCode = ccData & PACKET_LENGTH_MASK;
 
     uint8 pktSize;
     if( pktSizeCode == 0 ) {
@@ -930,40 +938,15 @@ static void decodePacketStart( CcDataOutputCtx* ctxPtr, uint8 ccData1, uint8 ccD
         pktSize = 2 * pktSizeCode;
     }
 
-/*+-------------------------------------------------------------------------+----+-------+
-  |                        Service Block Syntax                             |bits| value |
-  +-------------------------------------------------------------------------+----+-------+
-  | service_block() {                                                       |    |       |
-  |   service_number                                                        |  3 |       |
-  |   block_size                                                            |  5 |       |
-  |   if( service_number == b'111' && block_size != 0 ) {                   |    |       |
-  |     null_fill                                                           |  2 |  '00' |
-  |     extended_service_number                                             |  6 |       |
-  |   }                                                                     |    |       |
-  |   if( service_number != 0 ) {                                           |    |       |
-  |     for( i = 0; i < block_size; i++ ) {                                 |    |       |
-  |       block_data                                                        |  8 |       |
-  |     }                                                                   |    |       |
-  |   }                                                                     |    |       |
-  | }                                                                       |    |       |
-  +-------------------------------------------------------------------------+----+-------+*/
+    ctxPtr->cea708PacketBytesRemaining = pktSize - 1;
 
-    uint8 srvcNum = (ccData2 & SERVICE_NUMBER_MASK) >> SERVICE_NUMBER_SHIFT;     // 3 more significant bits
-    uint8 blkSize = (ccData2 & SERVICE_BLOCK_SIZE_MASK);                         // 5 less significant bits
+    len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "<--%dP%03d", seqNum, pktSize);
+    ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
 
-    if( srvcNum == EXTENDED_SRV_NUM_PATTERN ) {
-        ctxPtr->cea708State = CEA708_STATE_EXTENDED_SEQ_NUM;
-        len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "<-Srvc:Ex");
-        ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE - 1));
-    } else {
-        ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
-        ctxPtr->currentService = srvcNum;
-        len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "<-Srvc:%02d", srvcNum);
-        ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE - 1));
-    }
-    len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "<--Seq:%d P%03d-B%02d", seqNum, pktSize, blkSize);
-    ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
+    len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "<--%d", seqNum);
+    ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
 
+    ctxPtr->cea708State = CEA708_STATE_BLOCK_HEADER_WAIT;
 } // decodePacketStart()
 
 /*------------------------------------------------------------------------------
@@ -976,82 +959,199 @@ static void decodePacketStart( CcDataOutputCtx* ctxPtr, uint8 ccData1, uint8 ccD
 static void decodePacketData( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagStr, char* decStr, TextString* txtStr, char* errStr ) {
     int len;
 
-    if( ctxPtr->cea708State  == CEA708_STATE_EXTENDED_SEQ_NUM ) {
-        ctxPtr->currentService = ccData & 0x3F;
-        ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
-        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "S:%02d", ctxPtr->currentService);
-        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "ExSvc:%02d", ctxPtr->currentService);
-        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-    } else if( ctxPtr->cea708State  == CEA708_STATE_DATA_WAIT ) {
-        if( ccData == 0 ) {
-// HACK - TODO - What happens in the other decode for this?
-            len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "?00?");
-            ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-            len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "?\?\?-0x00");
-            ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-// HACK - Error, or no? There are lots in the bad asset...
-//            LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "{%X} - Ignoring Spurious NULL on Srvc: %d", add708Error(ctxPtr, errStr), ctxPtr->currentService);
-        } else if( ccData != DTVCC_C0_EXT1 ) {
-            if ((ccData >= DTVCC_MIN_C0_CODE) && (ccData <= DTVCC_MAX_C0_CODE)) {
-                decodeC0CmdCode(ctxPtr, ccData, tagStr, decStr, errStr);
-            } else if ((ccData >= DTVCC_MIN_G0_CODE) && (ccData <= DTVCC_MAX_G0_CODE)) {
-                if( strlen(DtvccDecodeG0CharSet(ccData)) == 1 ) {
-                    len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G0:%s", DtvccDecodeG0CharSet(ccData));
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                    len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G0Svc:%02d", ctxPtr->currentService);
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                } else {
-                    len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G%s", DtvccDecodeG0CharSet(ccData));
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                    len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "S:%02d %s", ctxPtr->currentService, DtvccDecodeG0CharSet(ccData));
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                }
-                strcat(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG0CharSet(ccData));
-            } else if ((ccData >= DTVCC_MIN_C1_CODE) && (ccData <= DTVCC_MAX_C1_CODE)) {
-                decodeC1CmdCode(ctxPtr, ccData, tagStr, decStr, errStr);
-            } else {
-                if( strlen(DtvccDecodeG1CharSet(ccData)) == 1 ) {
-                    len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G1:%s", DtvccDecodeG1CharSet(ccData));
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                    len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G1 - \"%s\"", DtvccDecodeG1CharSet(ccData));
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                } else {
-                    len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G:%s", DtvccDecodeG1CharSet(ccData));
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                    len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G1 -\"%s\"", DtvccDecodeG1CharSet(ccData));
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                }
-                strcat(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG1CharSet(ccData));
-            }
-        } else {  // Use Extended Set
-            ctxPtr->cea708State = CEA708_STATE_EXTENDED_CODE;
-            ctxPtr->cea708Code = CEA708_CODE_EXTENDED_CODE_UNKNOWN;
-            ctxPtr->cea708BytesRemaining = 0;
-            len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "EXT1");
-            ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-            len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "Extended");
-            ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-        }
+    if( ctxPtr->cea708State == CEA708_STATE_PACKET_HEADER_WAIT ) {
+        LOG(DEBUG_LEVEL_ERROR, DBG_CCD_OUT, "Packet Data arrived before Packet Start!!");
     } else {
-        switch( ctxPtr->cea708State ) {
-            case CEA708_STATE_UNKNOWN:
-                break;
-            case CEA708_STATE_C0_CODE:
-                decodeC0CmdCode(ctxPtr, ccData, tagStr, decStr, errStr);
-                break;
-            case CEA708_STATE_C1_CODE:
-                decodeC1CmdCode(ctxPtr, ccData, tagStr, decStr, errStr);
-                break;
-            case CEA708_STATE_EXTENDED_CODE:
-                decodeExtCmdCode(ctxPtr, ccData, tagStr, decStr, txtStr, errStr);
-                break;
-            default:
-                LOG(DEBUG_LEVEL_ERROR, DBG_CCD_OUT, "{%X} - Unknown CEA-708 State: 0x%02X", add708Error(ctxPtr, errStr), ctxPtr->cea708State);
-                break;
+        if( ctxPtr->cea708State == CEA708_STATE_BLOCK_HEADER_WAIT ) {
+            decodeServiceBlockHeader(ctxPtr, ccData, tagStr, decStr, errStr);
+        } else if( ctxPtr->cea708State == CEA708_STATE_EXTENDED_SRV_NUM ) {
+            decodeServiceBlockHeaderExtension(ctxPtr, ccData, tagStr, decStr, errStr);
+        } else if( ctxPtr->cea708State  == CEA708_STATE_DATA_WAIT ) {
+            if( ccData == 0 ) {
+    // HACK - TODO - What happens in the other decode for this?
+                len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "?00?");
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "?\?\?-0x00");
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+    // HACK - Error, or no? There are lots in the bad asset...
+    //            LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "{%X} - Ignoring Spurious NULL on Srvc: %d", add708Error(ctxPtr, errStr), ctxPtr->currentService);
+            } else if( ccData != DTVCC_C0_EXT1 ) {
+                if ((ccData >= DTVCC_MIN_C0_CODE) && (ccData <= DTVCC_MAX_C0_CODE)) {
+                    decodeC0CmdCode(ctxPtr, ccData, tagStr, decStr, errStr);
+                } else if ((ccData >= DTVCC_MIN_G0_CODE) && (ccData <= DTVCC_MAX_G0_CODE)) {
+                    if( strlen(DtvccDecodeG0CharSet(ccData)) == 1 ) {
+                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G0:%s", DtvccDecodeG0CharSet(ccData));
+                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G0Svc:%02d", ctxPtr->currentService);
+                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+                    } else {
+                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G%s", DtvccDecodeG0CharSet(ccData));
+                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "S:%02d %s", ctxPtr->currentService, DtvccDecodeG0CharSet(ccData));
+                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+                    }
+                    appendText(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG0CharSet(ccData));
+                } else if ((ccData >= DTVCC_MIN_C1_CODE) && (ccData <= DTVCC_MAX_C1_CODE)) {
+                    decodeC1CmdCode(ctxPtr, ccData, tagStr, decStr, errStr);
+                } else {
+                    if( strlen(DtvccDecodeG1CharSet(ccData)) == 1 ) {
+                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G1:%s", DtvccDecodeG1CharSet(ccData));
+                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G1 - \"%s\"", DtvccDecodeG1CharSet(ccData));
+                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+                    } else {
+                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G:%s", DtvccDecodeG1CharSet(ccData));
+                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G1 -\"%s\"", DtvccDecodeG1CharSet(ccData));
+                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+                    }
+                    appendText(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG1CharSet(ccData));
+                }
+            } else {  // Use Extended Set
+                ctxPtr->cea708State = CEA708_STATE_EXTENDED_CODE;
+                ctxPtr->cea708Code = CEA708_CODE_EXTENDED_CODE_UNKNOWN;
+                ctxPtr->cea708BytesRemaining = 0;
+                len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "EXT1");
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "Extended");
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+            }
+
+            ctxPtr->cea708BlockBytesRemaining = ctxPtr->cea708BlockBytesRemaining - 1;
+        } else {
+            switch( ctxPtr->cea708State ) {
+                case CEA708_STATE_UNKNOWN:
+                    break;
+                case CEA708_STATE_C0_CODE:
+                    decodeC0CmdCode(ctxPtr, ccData, tagStr, decStr, errStr);
+                    break;
+                case CEA708_STATE_C1_CODE:
+                    decodeC1CmdCode(ctxPtr, ccData, tagStr, decStr, errStr);
+                    break;
+                case CEA708_STATE_EXTENDED_CODE:
+                    decodeExtCmdCode(ctxPtr, ccData, tagStr, decStr, txtStr, errStr);
+                    break;
+                default:
+                    LOG(DEBUG_LEVEL_ERROR, DBG_CCD_OUT, "{%X} - Unknown CEA-708 State: 0x%02X", add708Error(ctxPtr, errStr), ctxPtr->cea708State);
+                    break;
+            }
+
+            ctxPtr->cea708BlockBytesRemaining = ctxPtr->cea708BlockBytesRemaining - 1;
+        }
+
+        ctxPtr->cea708PacketBytesRemaining = ctxPtr->cea708PacketBytesRemaining - 1;
+    }
+
+    if( ctxPtr->cea708BlockBytesRemaining == 0 ) {
+        ctxPtr->cea708State = CEA708_STATE_BLOCK_HEADER_WAIT;
+    }
+
+    if( ctxPtr->cea708PacketBytesRemaining == 0 ) {
+        ctxPtr->cea708State = CEA708_STATE_PACKET_HEADER_WAIT;
+    }
+
+} // decodePacketData()
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    decodeServiceBlockHeader()
+ |
+ | DESCRIPTION:
+ |    This function decodes a CEA-708 Standard Service Block Header
+ -------------------------------------------------------------------------------*/
+static void decodeServiceBlockHeader( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagStr, char* decStr, char* errStr ) {
+    int len;
+
+    /*+-------------------------------------------------------------------------+----+-------+
+      |                        Service Block Syntax                             |bits| value |
+      +-------------------------------------------------------------------------+----+-------+
+      | service_block() {                                                       |    |       |
+      |   service_number                                                        |  3 |       |
+      |   block_size                                                            |  5 |       |
+      |   if( service_number == b'111' && block_size != 0 ) {                   |    |       |
+      |     null_fill                                                           |  2 |  '00' |
+      |     extended_service_number                                             |  6 |       |
+      |   }                                                                     |    |       |
+      |   if( service_number != 0 ) {                                           |    |       |
+      |     for( i = 0; i < block_size; i++ ) {                                 |    |       |
+      |       block_data                                                        |  8 |       |
+      |     }                                                                   |    |       |
+      |   }                                                                     |    |       |
+      | }                                                                       |    |       |
+      +-------------------------------------------------------------------------+----+-------+*/
+
+    uint8 srvcNum = (ccData & SERVICE_NUMBER_MASK) >> SERVICE_NUMBER_SHIFT;     // 3 more significant bits
+    uint8 blkSize = (ccData & SERVICE_BLOCK_SIZE_MASK);                         // 5 less significant bits
+
+    ctxPtr->cea708BlockBytesRemaining = blkSize;
+    len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "B:%02d", blkSize);
+    ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+
+    if( srvcNum == EXTENDED_SRV_NUM_PATTERN && blkSize ) {
+        ctxPtr->cea708State = CEA708_STATE_EXTENDED_SRV_NUM;
+
+        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "B:%02d,SEx", blkSize);
+        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+    } else if ( srvcNum ) {
+        ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
+        ctxPtr->currentService = srvcNum;
+
+        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "B:%02d,S%02d", blkSize, srvcNum);
+        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+    } else {
+        if( blkSize ) {
+            LOG(DEBUG_LEVEL_ERROR, DBG_CCD_OUT, "{%X} - Invalid non-zero length Service Block with Service Number 0; ignoring Service Block",
+                add708Error(ctxPtr, errStr));
+            ctxPtr->currentService = UNKNOWN_SERVICE;
+            ctxPtr->cea708State = CEA708_STATE_UNKNOWN;
+        } else {
+            // Null Service Block Header
+            // await next Service Block Header, if packet bytes remaining?
+
+            ctxPtr->cea708State = CEA708_STATE_BLOCK_HEADER_WAIT;
+            ctxPtr->cea708BlockBytesRemaining = 0;
+
+            len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "B:NULL  ");
+            ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
         }
     }
-} // decodePacketData()
+
+    // should probably do some checking of allowed blk size/srv num etc
+}
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    decodeServiceBlockHeaderExtension()
+ |
+ | DESCRIPTION:
+ |    This function decodes byte 2 of a CEA-708 Extended Service Block Header
+ -------------------------------------------------------------------------------*/
+static void decodeServiceBlockHeaderExtension( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagStr, char* decStr, char* errStr ) {
+    int len;
+    uint8 extSvcNum = ccData & EXTENDED_SRV_NUM_MASK;
+
+    if( extSvcNum == 0 ) {
+        LOG(DEBUG_LEVEL_ERROR, DBG_CCD_OUT, "{%X} - Invalid Extended Service Number 0; ignoring Service Block",
+            add708Error(ctxPtr, errStr));
+        ctxPtr->currentService = UNKNOWN_SERVICE;
+        ctxPtr->cea708State = CEA708_STATE_UNKNOWN;
+    } else {
+        if( extSvcNum < EXTENDED_SRV_NUM_MIN ) {
+            // Extended Service Numbers below 7 should have used a Standard Service
+            // Block Header. Not permitted by the spec, but unambiguous and in range,
+            // so warn and decode it as that Service.
+            LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "Irregular Extended Service Number %d (below %d); decoding as Service %d",
+                extSvcNum, EXTENDED_SRV_NUM_MIN, extSvcNum);
+        }
+        ctxPtr->currentService = extSvcNum;
+        ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
+    }
+
+    len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "S:%02d", extSvcNum);
+    ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+    len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "ExSvc:%02d", extSvcNum);
+    ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+}
 
 /*------------------------------------------------------------------------------
  | NAME:
@@ -1238,7 +1338,7 @@ static void decodeC1CmdCode( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagStr
                    (ccData == DTVCC_C1_RSV96) ) {
             len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "RSV ");
             ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-            len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "{RSV-%X} ", ccData);
+            len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "{RSV-%X}", ccData);
             ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
             // --- Set Window Attributes {SWA} ---
         } else if( ccData == DTVCC_C1_SWA ) {
