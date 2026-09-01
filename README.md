@@ -115,9 +115,13 @@ is an HTML file that is the output of the test. It contains all of the tests, an
 directory and takes the form `<date>__<time>_test_output.html`. To view the results you can open the file inside of
 a browser.
 
-To run the regression tests from the command line, you need to install Xunit Viewer, which can be found [here](https://github.com/lukejpreston/xunit-viewer).
-Xunit Viewer is the application that takes the Xunit XML and converts it into a beautified HTML format. Once you have
-Xunit Viewer installed, or if you ignore it, you just need to build and run the regression tests from the test directory.
+The Python test suites are run with [pytest](https://docs.pytest.org/) (`pip install pytest`). If pytest is not
+installed the Python suites are skipped with a warning and the C tests still run.
+
+The HTML report is produced by [Xunit Viewer](https://github.com/lukejpreston/xunit-viewer), which converts the Xunit
+XML into a beautified HTML format. It is optional: if it is not installed, the run notes this and leaves the raw
+`<date>__<time>_test_output.xml` in place. Once you have these tools installed, or if you ignore them, you just need to
+build and run the regression tests from the test directory.
 
 ```
 cd test

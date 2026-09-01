@@ -5,6 +5,8 @@ import ctypes
 import os
 import sys
 import subprocess
+import shutil
+import importlib.util
 from datetime import datetime
 
 CAPTION_INSPECTOR_EXE = '../../caption-inspector'
@@ -21,8 +23,21 @@ c_unit_test_suites = ['utest__buffer_utils_c', 'utest__cc_utils_c', 'utest__exte
                       'utest__cc_data_output_c', 'utest__mcc_decode_c']
 
 
+# Optional external tooling. pytest runs the Python test suites; xunit-viewer
+# turns the XUnit XML into a browsable HTML report. Both are optional - when a
+# tool is missing we say so clearly and carry on rather than failing obscurely.
+HAVE_PYTEST = importlib.util.find_spec('pytest') is not None
+HAVE_XUNIT_VIEWER = shutil.which('xunit-viewer') is not None
+# Invoke pytest as a module so it is found whenever the package is importable,
+# even if the 'pytest' console script is not on PATH.
+PYTEST_CMD = '"' + sys.executable + '" -m pytest'
+
+
 def run_test(test_name):
-    os.system('pytest -o junit_suite_name=' + test_name + ' --junitxml ' + test_name + '.xml test__' + test_name + '.py')
+    if not HAVE_PYTEST:
+        print("SKIPPED '" + test_name + "': pytest is not installed (install with: pip install pytest).")
+        return
+    os.system(PYTEST_CMD + ' -o junit_suite_name=' + test_name + ' --junitxml ' + test_name + '.xml test__' + test_name + '.py')
     print('Testing Complete: Results written to file - ' + test_name + '.xml')
 #    os.system('xunit-viewer --results=' + test_name + '.xml --output=' + test_name + '.html --title="Caption Inspector Python Test Suite"')
 #    print('XML Results file: ' + test_name + '.xml converted to HTML: ' + test_name + '.html')
@@ -52,11 +67,15 @@ if __name__ == "__main__":
         file.write("<testsuites name=\"Caption Inspector " + exe_ver + " Tests\">\n")
         file.close()
         retval = 0
-        for test in py_test_suites:
-            if os.system('pytest -o junit_suite_name="' + py_test_suites_names[test] + '" --junitxml ' + date_str + '_' + test + '.xml test__' + test + '.py') != 0 or retval != 0:
-                retval = 1
-            os.system('cat ' + date_str + '_' + test + '.xml >> ' + out_file_name + '.xml')
-#            os.system('rm ' + date_str + '_' + test + '.xml')
+        if HAVE_PYTEST:
+            for test in py_test_suites:
+                if os.system(PYTEST_CMD + ' -o junit_suite_name="' + py_test_suites_names[test] + '" --junitxml ' + date_str + '_' + test + '.xml test__' + test + '.py') != 0 or retval != 0:
+                    retval = 1
+                os.system('cat ' + date_str + '_' + test + '.xml >> ' + out_file_name + '.xml')
+#                os.system('rm ' + date_str + '_' + test + '.xml')
+        else:
+            print("\nWARNING: pytest is not installed - skipping the Python test suites (" +
+                  ", ".join(py_test_suites) + "). Install with: pip install pytest\n")
         for test in c_integ_test_suites:
             if os.system('../' + test + ' ' + date_str + '_' + test + '.xml') != 0 or retval != 0:
                 retval = 1
@@ -68,12 +87,15 @@ if __name__ == "__main__":
             os.system('cat ' + date_str + '_' + test + '.xml >> ' + out_file_name + '.xml')
 #            os.system('rm ' + date_str + '_' + test + '.xml')
         os.system("echo \"</testsuites>\n\n\" >> " + out_file_name + '.xml')
-        print('xunit-viewer --results=' + out_file_name + '.xml --output=' + out_file_name +
-              '.html --title="Caption Inspector ' + exe_ver + ' Full Test Suite"')
-        os.system('xunit-viewer --results=' + out_file_name + '.xml --output=' + out_file_name +
-                  '.html --title="Caption Inspector ' + exe_ver + ' Full Test Suite"')
-        print('XML Results file: ' + out_file_name + '.xml converted to HTML: ' + out_file_name + '.html')
-        if len(sys.argv) == 1 or str(sys.argv[1]) != "docker":
-            os.system('open ' + out_file_name + '.html')
+        if HAVE_XUNIT_VIEWER:
+            os.system('xunit-viewer --results=' + out_file_name + '.xml --output=' + out_file_name +
+                      '.html --title="Caption Inspector ' + exe_ver + ' Full Test Suite"')
+            print('XML Results file: ' + out_file_name + '.xml converted to HTML: ' + out_file_name + '.html')
+            # 'open' is macOS-only; only pop the report for an interactive local run.
+            if (len(sys.argv) == 1 or str(sys.argv[1]) != "docker") and sys.platform == 'darwin':
+                os.system('open ' + out_file_name + '.html')
+        else:
+            print("\nNOTE: xunit-viewer is not installed - skipping the HTML report; raw results are in " +
+                  out_file_name + ".xml. Install: https://github.com/lukejpreston/xunit-viewer\n")
         sys.exit(retval)
 
