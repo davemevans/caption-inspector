@@ -104,11 +104,24 @@ boolean MccFileInitialize( Context* rootCtxPtr, char* fileNameStr ) {
     while( captionsStarted == FALSE ) {
         pos = ftell(ctxPtr->captionsFilePtr);
         read = getline(&line, &len, ctxPtr->captionsFilePtr);
-        
+
+        if( read == -1 ) {
+            // End of file reached while still parsing the header. An empty file would
+            // leave line == NULL (the strncmp below would dereference NULL), and a
+            // header-only file would loop here forever, so bail out cleanly.
+            LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Reached end of file parsing header; no caption data found");
+            fclose(ctxPtr->captionsFilePtr);
+            free(ctxPtr);
+            free(line);
+            rootCtxPtr->mccFileCtxPtr = NULL;
+            return FALSE;
+        }
+
         if( strncmp(line, "Scenarist_SCC V1.0", strlen("Scenarist_SCC V1.0")) == 0 ) {
             LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Spurious line from an SCC File");
             fclose(ctxPtr->captionsFilePtr);
             free(ctxPtr);
+            free(line);
             rootCtxPtr->mccFileCtxPtr = NULL;
             return FALSE;
         } else if( strncmp(line, "File Format=MacCaption_MCC V", strlen("File Format=MacCaption_MCC V")) == 0 ) {
@@ -117,12 +130,14 @@ boolean MccFileInitialize( Context* rootCtxPtr, char* fileNameStr ) {
             LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Spurious line from an encoded SEI File");
             fclose(ctxPtr->captionsFilePtr);
             free(ctxPtr);
+            free(line);
             rootCtxPtr->mccFileCtxPtr = NULL;
             return FALSE;
         } else if( strncmp(line, "File Format=Comcast CC Data File", strlen("File Format=Comcast CC Data File")) == 0 ) {
             LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Spurious line from a CC Data File");
             fclose(ctxPtr->captionsFilePtr);
             free(ctxPtr);
+            free(line);
             rootCtxPtr->mccFileCtxPtr = NULL;
             return FALSE;
         } else if( (strncmp(line, "//", 2) == 0) || (read < 5) ) {
@@ -225,10 +240,12 @@ uint8 MccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
             fclose(ctxPtr->captionsFilePtr);
             Sinks sinks = ctxPtr->sinks;
             free(ctxPtr);
+            free(line);
             rootCtxPtr->mccFileCtxPtr = NULL;
             *isDonePtr = TRUE;
             return ShutdownSinks(rootCtxPtr, &sinks);
         } else if( read < 5 ) {
+            free(line);
             line = NULL;
         }
     }
@@ -245,6 +262,7 @@ uint8 MccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
             ctxPtr->oneShotWarningFlag = TRUE;
             LOG(DEBUG_LEVEL_WARN, DBG_FILE_IN, "Detected MCC 2.0. Handling file (in a kludgy way), but MCC 2.0 is not fully supported.");
         }
+        free(line);
         return TRUE;
     }
 
@@ -258,6 +276,7 @@ uint8 MccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
     if( wasSuccessful == FALSE ) {
         LOG(DEBUG_LEVEL_WARN, DBG_FILE_IN, "Unable to parse timecode on line: %s", line);
         FreeBuffer(newBufferPtr);
+        free(line);
         return TRUE;
     }
 
@@ -272,6 +291,10 @@ uint8 MccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
 
     LOG(DEBUG_LEVEL_VERBOSE, DBG_GENERAL, "Captions File: %s Line: %d - Processed %d bytes of mcc caption data",
         ctxPtr->captionFileName, ctxPtr->numCaptionsLinesRead, newBufferPtr->numElements);
+
+    if( line ) {
+        free(line);
+    }
 
     return PassToSinks(rootCtxPtr, newBufferPtr, &ctxPtr->sinks);
     
