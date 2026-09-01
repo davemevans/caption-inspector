@@ -319,6 +319,47 @@ uint8 cdpFramerateFromFramerate( uint32 frameRatePerSecTimesOneHundred ) {
 
 /*------------------------------------------------------------------------------
  | NAME:
+ |    timeCodeRateToFrameRateTimesOneHundred()
+ |
+ | INPUT PARAMETERS:
+ |    baseRate - (Framerate / Sec).
+ |    df - DropFrame
+ |
+ | RETURN VALUES:
+ |    FrameRateTimesOneHundred
+ |
+ | DESCRIPTION:
+ |    Takes the number part of the MCC Time Code Rate, and whether it was
+ |    was follwed by DF, and returns the actual frame rate, times one hundred.
+ -------------------------------------------------------------------------------*/
+uint16 timeCodeRateToFrameRateTimesOneHundred(uint8 baseRate, boolean df) {
+    uint16 retval = 0;
+    switch (baseRate) {
+        case 24:
+            retval = df ? 2397 : 2400;
+            break;
+        case 25:
+            retval = 2500;
+            break;
+        case 30:
+            retval = df ? 2997 : 3000;
+            break;
+        case 50:
+            retval = 5000;
+            break;
+        case 60:
+            retval = df ? 5994 : 6000;
+            break;
+        default:
+            LOG(DEBUG_LEVEL_ERROR, DBG_GENERAL,"Unknown Time Code Rate: %d%s", baseRate, df ? "DF" : "");
+            break;
+    }
+
+    return retval;
+}  // timeCodeRateToFrameRateTimesOneHundred()
+
+/*------------------------------------------------------------------------------
+ | NAME:
  |    isFramerateValid()
  |
  | INPUT PARAMETERS:
