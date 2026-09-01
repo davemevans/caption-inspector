@@ -261,7 +261,8 @@ uint8 Line21DecodeShutdown( void* rootCtxPtr ) {
                 } else if( ctxPtr->isPaintOnCaptioning[loop] == TRUE ) {
                     LOG(DEBUG_LEVEL_INFO, DBG_608_DEC, "Found Line 21 PaintOn Captioning on Channel %d", loop);
                 } else {
-                    ASSERT(0);
+                    LOG(DEBUG_LEVEL_WARN, DBG_608_DEC, "Unset Line 21 Captioning Type on Channel %d: PopOn - %d; RollUp - %d; PaintOn - %d",
+                        loop, ctxPtr->isPopOnCaptioning[loop], ctxPtr->isRollUpCaptioning[loop], ctxPtr->isPaintOnCaptioning[loop] );
                 }
             } else {
                 LOG(DEBUG_LEVEL_WARN, DBG_608_DEC, "Ambiguous Line 21 Captioning Type on Channel %d: PopOn - %d; RollUp - %d; PaintOn - %d",
