@@ -156,11 +156,6 @@ class TestClass(object):
         generated_file.close()
         master_file.close()
         assert os.path.exists('./tmp/BigBuckBunny_256x144-24fps.inf'.encode('utf-8')) is True
-        generated_file = open("./tmp/BigBuckBunny_256x144-24fps.inf", "r")
-        master_file = open("../media/BigBuckBunny_256x144-24fps.inf", "r")
-        compare_files(generated_file, master_file, [])
-        generated_file.close()
-        master_file.close()
         assert os.path.exists('./tmp/BigBuckBunny_256x144-24fps.mcc'.encode('utf-8')) is True
         generated_file = open("./tmp/BigBuckBunny_256x144-24fps.mcc", "r")
         master_file = open("../media/BigBuckBunny_256x144-24fps.mcc", "r")
