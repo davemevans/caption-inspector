@@ -238,8 +238,8 @@ ${UTEST_MCC_DECODE_EXE}: ${UTEST_MCC_DECODE_OBJ} ${OBJS_WITH_PATH} ${TEST_OBJS_W
 	gcc -o ${UTEST_MCC_DECODE_EXE} ${UTEST_MCC_DECODE_OBJ_IN_OBJ_DIR} ${UTEST_MCC_DECODE_APP_OBJS} ${TEST_OBJS_IN_OBJ_DIR} ${LD_FLAGS}
 
 docker:
-	docker build -t caption-inspector-test .
-	DCID=$$(docker create -v $(PWD):/files caption-inspector-test) && docker cp ../../caption-inspector/. $${DCID}:/app/caption-inspector && docker start -ai $${DCID}
+	docker build --target test -t caption-inspector-test ..
+	docker run --rm -v $(CURDIR):/files caption-inspector-test
 	@echo "Test results copied locally:"
 	@ls -1 *.html
 
@@ -258,7 +258,7 @@ docker-test:
 	make all WITH_GPAC=1
 	cd ../; make ci_with_gpac
 	@echo "\n*** Running Tests on Docker ***"
-	cd python; python3 test_engine.py docker; cp *.html /files
+	cd python; python3 test_engine.py docker; status=$$?; cp *.html /files; exit $$status
 
 clean:
 	@echo "\n*** Cleaning Target Files. ***"
