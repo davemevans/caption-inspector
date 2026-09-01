@@ -16,6 +16,8 @@ cmake-build-debug/
 test/python/libci-test.1.0.0.dylib
 test/python/*.xml
 test/python/*.html
+test/*.xml
+test/*.html
 test/utest__buffer_utils_c
 test/utest__cc_utils_c
 test/utest__external_adaptor_c
