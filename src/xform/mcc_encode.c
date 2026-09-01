@@ -259,10 +259,10 @@ uint8 MccEncodeShutdown( void* rootCtxPtr ) {
         LOG(DEBUG_LEVEL_ERROR, DBG_MCC_ENC, "Adding %d frames to correct skew from missing frames in source", ((Context*)rootCtxPtr)->mccEncodeCtxPtr->totalSkew);
     }
     if( ((Context*)rootCtxPtr)->config.matchPtsTime == TRUE ) {
-        LOG(DEBUG_LEVEL_INFO, DBG_MCC_ENC, "Added %ld Fill Frames to match PTS Time", ((Context *) rootCtxPtr)->mccEncodeCtxPtr->numFillFrames);
+        LOG(DEBUG_LEVEL_INFO, DBG_MCC_ENC, "Added %u Fill Frames to match PTS Time", ((Context *) rootCtxPtr)->mccEncodeCtxPtr->numFillFrames);
     }
     if( ((Context*)rootCtxPtr)->config.matchPtsTime == TRUE ) {
-        LOG(DEBUG_LEVEL_INFO, DBG_MCC_ENC, "Added %ld Fill Frames to match PTS Time", ((Context *) rootCtxPtr)->mccEncodeCtxPtr->numFillFrames);
+        LOG(DEBUG_LEVEL_INFO, DBG_MCC_ENC, "Added %u Fill Frames to match PTS Time", ((Context *) rootCtxPtr)->mccEncodeCtxPtr->numFillFrames);
     }
     LOG(DEBUG_LEVEL_INFO, DBG_MCC_ENC, "Frame Time Ahead High Water Mark - %lld ms", ((Context*)rootCtxPtr)->mccEncodeCtxPtr->maxPositiveDelta);
     LOG(DEBUG_LEVEL_INFO, DBG_MCC_ENC, "Frame Time Behind High Water Mark - %lld ms", ((Context*)rootCtxPtr)->mccEncodeCtxPtr->maxNegativeDelta);
@@ -491,11 +491,11 @@ static uint8 handleSkew( Context* rootCtxPtr, CaptionTime* inCaptionTimePtr ) {
             }
         }
         if( minuteSkew == 0 ) {
-            sprintf(&scratchBuffer[strlen(scratchBuffer)], "%d:%02d -> %d:%02d = %ld\n",
+            sprintf(&scratchBuffer[strlen(scratchBuffer)], "%d:%02d -> %d:%02d = %u\n",
                     ctxPtr->lastCaptionTime.hour, ctxPtr->lastCaptionTime.minute, inCaptionTimePtr->hour,
                     inCaptionTimePtr->minute, minuteFrames);
         } else {
-            sprintf(&scratchBuffer[strlen(scratchBuffer)], "%d:%02d -> %d:%02d = %ld  --- Skew %ld\n",
+            sprintf(&scratchBuffer[strlen(scratchBuffer)], "%d:%02d -> %d:%02d = %u  --- Skew %u\n",
                     ctxPtr->lastCaptionTime.hour, ctxPtr->lastCaptionTime.minute, inCaptionTimePtr->hour,
                     inCaptionTimePtr->minute, minuteFrames, minuteSkew);
         }
@@ -590,12 +590,12 @@ static CaptionTime convertCaptionTime( Context* rootCtxPtr, Buffer* inBufferPtr 
 #ifdef DEBUG_CAPTION_TIMING
         if( actualTimeInMs > frameSizeMs ) {
             deltaInMs = actualTimeInMs - frameTimeInMs;
-            printf("%02d:%02d:%02d:%03d, %02d:%02d:%02d:%02d, %lld, %ld\n", inCaptionTimePtr->hour, inCaptionTimePtr->minute,
+            printf("%02d:%02d:%02d:%03d, %02d:%02d:%02d:%02d, %lld, %u\n", inCaptionTimePtr->hour, inCaptionTimePtr->minute,
                    inCaptionTimePtr->second, inCaptionTimePtr->millisecond, captionTime.hour, captionTime.minute,
                    captionTime.second, captionTime.frame, deltaInMs, ctxPtr->numFillFrames);
         } else if( actualTimeInMs < frameSizeMs ) {
             deltaInMs = frameTimeInMs - actualTimeInMs;
-            printf("%02d:%02d:%02d:%03d, %02d:%02d:%02d:%02d, -%lld, %ld\n", inCaptionTimePtr->hour, inCaptionTimePtr->minute,
+            printf("%02d:%02d:%02d:%03d, %02d:%02d:%02d:%02d, -%lld, %u\n", inCaptionTimePtr->hour, inCaptionTimePtr->minute,
                    inCaptionTimePtr->second, inCaptionTimePtr->millisecond, captionTime.hour, captionTime.minute,
                    captionTime.second, captionTime.frame, deltaInMs, ctxPtr->numFillFrames);
         }
