@@ -115,24 +115,29 @@ OBJS = $(SRC_OBJS) $(XFORM_OBJS) $(SINK_OBJS) $(UTIL_OBJS)
 OBJS_WITH_PATH = $(SRC_OBJS_WITH_PATH) $(XFORM_OBJS_WITH_PATH) $(SINK_OBJS_WITH_PATH) $(UTIL_OBJS_WITH_PATH)
 OBJS_IN_OBJ_DIR = $(foreach OBJS, $(OBJS), ../obj/$(OBJS))
 
+# Locate FFmpeg via pkg-config on every platform: Homebrew installs into a
+# versioned, prefix-specific path (e.g. /opt/homebrew/Cellar/ffmpeg/<ver>), and
+# on Linux it may come from distro packages or a source build in /usr/local, so
+# hardcoded -I/-L flags do not work.
+# Only the targets below build without FFmpeg, so only they skip the check.
+FFMPEG_PKGS := libavformat libavcodec libavutil
+FFMPEG_FREE_GOALS := clean ci_without_ffmpeg no_ffmpeg
+ifneq ($(filter-out $(FFMPEG_FREE_GOALS),$(or $(MAKECMDGOALS),all)),)
+ifneq ($(shell pkg-config --exists $(FFMPEG_PKGS) && echo yes),yes)
+$(error FFmpeg not found via pkg-config; install it (e.g. 'brew install ffmpeg pkg-config', or 'apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config') or set PKG_CONFIG_PATH)
+endif
+endif
+FFMPEG_CFLAGS := $(shell pkg-config --cflags $(FFMPEG_PKGS) 2>/dev/null)
+LD_FLAGS_FFMPEG := $(shell pkg-config --libs $(FFMPEG_PKGS) 2>/dev/null)
+
 ifeq ($(UNAME), Linux)
-C_FLAGS = -Wpedantic -Wno-deprecated-declarations -Wall -fno-strict-aliasing -fPIC -DPIC
+C_FLAGS = -Wpedantic -Wno-deprecated-declarations -Wall -fno-strict-aliasing -fPIC -DPIC $(FFMPEG_CFLAGS)
 SO_FLAGS = -shared -W
 LD_FLAGS = -L/usr/local/lib -luuid -lm -lz
-LD_FLAGS_FFMPEG = -lavformat -lavcodec -lavutil
 else
-# Locate FFmpeg via pkg-config: Homebrew installs into a versioned, prefix-
-# specific path (e.g. /opt/homebrew/Cellar/ffmpeg/<ver>) that varies by machine
-# and changes on every upgrade, so hardcoded -I/-L flags do not work.
-FFMPEG_PKGS := libavformat libavcodec libavutil
-ifneq ($(shell pkg-config --exists $(FFMPEG_PKGS) && echo yes),yes)
-$(error FFmpeg not found via pkg-config; install it (e.g. 'brew install ffmpeg pkg-config') or set PKG_CONFIG_PATH)
-endif
-FFMPEG_CFLAGS := $(shell pkg-config --cflags $(FFMPEG_PKGS))
 C_FLAGS = -Wpedantic -Wno-deprecated-declarations $(FFMPEG_CFLAGS)
 SO_FLAGS = -dynamiclib
 LD_FLAGS = -L/usr/local/lib -lz
-LD_FLAGS_FFMPEG := $(shell pkg-config --libs $(FFMPEG_PKGS))
 endif
 
 -include ../obj/$(OBJS:.o=.d)
@@ -144,7 +149,7 @@ all: ${CI_EXECUTABLE} ${CI_SHARED_LIB}
 
 ${CI_EXECUTABLE}: $(OBJS_WITH_PATH) main.o
 	@echo "\n*** Compiling Caption Inpsector Executible. ***"
-	clang -o ${CI_EXECUTABLE} ../obj/main.o $(OBJS_IN_OBJ_DIR) $(LD_FLAGS) $(LD_FLAGS_FFMPEG)
+	clang -o ${CI_EXECUTABLE} ../obj/main.o $(OBJS_IN_OBJ_DIR) $(LD_FLAGS_FFMPEG) $(LD_FLAGS)
 
 no_ffmpeg: $(OBJS_WITH_PATH) main.o
 	@echo "\n*** Compiling Caption Inpsector Executible without FFMPEG. ***"
@@ -159,7 +164,7 @@ no_ffmpeg: $(OBJS_WITH_PATH) main.o
 
 with_gpac: /usr/local/lib/libgpac.so $(OBJS_WITH_PATH) main.o
 	@echo "\n*** Compiling Caption Inspector Executible with GPAC. ***"
-	clang -o ${CI_EXECUTABLE} ../obj/main.o $(OBJS_IN_OBJ_DIR) $(LD_FLAGS) $(LD_FLAGS_FFMPEG) -lgpac
+	clang -o ${CI_EXECUTABLE} ../obj/main.o $(OBJS_IN_OBJ_DIR) $(LD_FLAGS_FFMPEG) $(LD_FLAGS) -lgpac
 
 ci_without_ffmpeg: C_FLAGS:=$(C_FLAGS) -DDONT_COMPILE_FFMPEG
 ci_without_ffmpeg: no_ffmpeg
@@ -169,7 +174,7 @@ ci_with_gpac: with_gpac
 
 ${CI_SHARED_LIB}: $(OBJS_WITH_PATH)
 	@echo "\n*** Compiling Caption Inspector Dynamic Library to interface with Python. ***"
-	clang $(SO_FLAGS) -o ${CI_SHARED_LIB} $(OBJS_IN_OBJ_DIR) ${LD_FLAGS} ${LD_FLAGS_FFMPEG}
+	clang $(SO_FLAGS) -o ${CI_SHARED_LIB} $(OBJS_IN_OBJ_DIR) ${LD_FLAGS_FFMPEG} ${LD_FLAGS}
 
 clean:
 	@echo "*** Cleaning Target Files. ***"
