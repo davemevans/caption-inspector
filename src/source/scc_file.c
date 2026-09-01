@@ -245,6 +245,18 @@ uint8 SccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
         } else if( read < 5 ) {
             free(line);
             line = NULL;
+        } else {
+            // getline returns line terminators which we don't want
+            if (line[read - 1] == '\n') {
+                line[read - 1] = '\0';
+                read--;
+            }
+
+            // also strip carriage return (\r) if it exists (Windows)
+            if (line[read - 1] == '\r') {
+                line[read - 1] = '\0';
+                read--;
+            }
         }
     }
 
