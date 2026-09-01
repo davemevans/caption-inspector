@@ -25,6 +25,7 @@
 
 #ifndef DONT_COMPILE_FFMPEG
 #include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
 #endif
 
 #ifdef COMPILE_GPAC
@@ -116,6 +117,8 @@ typedef struct {
     AVFormatContext* formatContext;
     AVCodecContext* decoderContext;
     AVFrame* frame;
+    AVPacket* packet;
+    boolean draining;
     int streamIndex;
     boolean isFileOpen;
     uint32 frameRatePerSecTimesOneHundred;
@@ -126,6 +129,7 @@ typedef struct {
     uint32 len;
     int64 firstPts;
     uint32 ccCountMismatchErrors;
+    uint32 numRejectedPackets;
 } MpegFileCtx;
 #endif
 
