@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <string.h>
 #include <limits.h>
+#include <sys/wait.h>
 #include <zconf.h>
 
 #include "debug.h"
@@ -49,7 +50,9 @@ const char* captionFileTypeStr[MAX_FILE_TYPE] = {
 /*--                      Private Member Variables                          --*/
 /*----------------------------------------------------------------------------*/
 
-char* mediaInfoInvokeStr = "/usr/local/bin/mediainfo";
+// Resolve mediainfo via the PATH rather than a hardcoded location, so it works
+// wherever MediaInfo is installed (e.g. /usr/bin, /usr/local/bin, /opt/homebrew/bin).
+char* mediaInfoInvokeStr = "mediainfo";
 char* mediaInfoVerStr = "--Version";
 char* mediaInfoFullStr = "-full";
 char* dropframeTagStr = "Time code of first frame";
@@ -58,6 +61,7 @@ char* dropframeTagStr = "Time code of first frame";
 /*--                     Private Member Declarations                        --*/
 /*----------------------------------------------------------------------------*/
 
+static boolean shellQuote( const char*, char*, size_t );
 #ifdef COMPILE_GPAC
 static void gpacLoggingSink( void*, GF_LOG_Level, GF_LOG_Tool, const char*, va_list );
 #endif
@@ -87,7 +91,7 @@ static void gpacLoggingSink( void*, GF_LOG_Level, GF_LOG_Tool, const char*, va_l
 boolean DetermineDropFrame( char* fileNameStr, boolean saveMediaInfo, char* outputPath ) {
     FILE* filePtr;
     FILE* outFilePtr = NULL;
-    char invocationString[MAX_FILE_NAME_LEN*2];
+    char invocationString[(MAX_FILE_NAME_LEN*4)+32];
     char buffer[1035];
     boolean dfFound = FALSE;
     boolean isDropFrame = FALSE;
@@ -123,7 +127,15 @@ boolean DetermineDropFrame( char* fileNameStr, boolean saveMediaInfo, char* outp
         pclose(filePtr);
     }
 
-    sprintf(invocationString, "%s %s %s", mediaInfoInvokeStr, fileNameStr, mediaInfoFullStr);
+    // The file name goes through the shell, so quote it: a name with spaces or shell
+    // syntax would otherwise be split (silently mis-detecting DropFrame) or executed.
+    char quotedFileName[(MAX_FILE_NAME_LEN*4)+3];
+    if( (shellQuote(fileNameStr, quotedFileName, sizeof(quotedFileName)) == FALSE) ||
+        (snprintf(invocationString, sizeof(invocationString), "%s %s %s", mediaInfoInvokeStr,
+                  quotedFileName, mediaInfoFullStr) >= sizeof(invocationString)) ) {
+        LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "File name too long to pass to MediaInfo: %s", fileNameStr);
+        return FALSE;
+    }
 
     filePtr = popen(invocationString, "r");
     if( filePtr == NULL ) {
@@ -136,19 +148,23 @@ boolean DetermineDropFrame( char* fileNameStr, boolean saveMediaInfo, char* outp
 
     while( fgets(buffer, sizeof(buffer)-1, filePtr) != NULL ) {
         if( strncmp(buffer, dropframeTagStr, strlen(dropframeTagStr)) == 0 ) {
-            char* tmpCharPtr;
-            tmpCharPtr = strchr(buffer, ':');
-            tmpCharPtr = tmpCharPtr+2;
-            if( tmpCharPtr[8] == ';' ) {
-                dfFound = TRUE;
-                isDropFrame = TRUE;
-                LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "File: %s is determined to be dropframe", fileNameStr );
-            } else if( tmpCharPtr[8] == ':' ) {
-                dfFound = TRUE;
-                isDropFrame = FALSE;
-                LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "File: %s is determined to be non-dropframe", fileNameStr );
+            // Expecting "<tag> : HH:MM:SS;FF" (';' = dropframe) or ":FF" (non-dropframe).
+            char* tmpCharPtr = strchr(buffer, ':');
+            if( (tmpCharPtr != NULL) && (strlen(tmpCharPtr + 2) > 8) ) {
+                tmpCharPtr = tmpCharPtr + 2;
+                if( tmpCharPtr[8] == ';' ) {
+                    dfFound = TRUE;
+                    isDropFrame = TRUE;
+                    LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "File: %s is determined to be dropframe", fileNameStr );
+                } else if( tmpCharPtr[8] == ':' ) {
+                    dfFound = TRUE;
+                    isDropFrame = FALSE;
+                    LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "File: %s is determined to be non-dropframe", fileNameStr );
+                } else {
+                    LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Unable to determine DropFrame: %s %s", tmpCharPtr, buffer );
+                }
             } else {
-                LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Unable to determine DropFrame: %s %s", tmpCharPtr, buffer );
+                LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Unexpected Time Code format from MediaInfo: %s", buffer );
             }
         }
         if( saveMediaInfo == TRUE ) {
@@ -156,11 +172,21 @@ boolean DetermineDropFrame( char* fileNameStr, boolean saveMediaInfo, char* outp
             writeToFile(outFilePtr, buffer);
         }
     }
-    pclose(filePtr);
+    int mediaInfoStatus = pclose(filePtr);
 
     if( saveMediaInfo == TRUE ) {
         ASSERT(outFilePtr);
         closeFile(outFilePtr);
+    }
+
+    // popen() returns a valid stream even when the command cannot be found (the
+    // shell runs and exits 127), so a missing/failed mediainfo would otherwise be
+    // silently indistinguishable from "not dropframe". Surface it loudly instead.
+    if( (mediaInfoStatus == -1) || !WIFEXITED(mediaInfoStatus) || (WEXITSTATUS(mediaInfoStatus) != 0) ) {
+        int exitCode = (mediaInfoStatus == -1) ? -1 : WEXITSTATUS(mediaInfoStatus);
+        LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Unable to run '%s' (exit %d) - cannot determine DropFrame for %s. Is MediaInfo installed and on the PATH?",
+            mediaInfoInvokeStr, exitCode, fileNameStr);
+        return FALSE;
     }
 
     if( dfFound == TRUE ) {
@@ -276,11 +302,15 @@ FileType DetermineFileType( char* fileNameStr ) {
             if( wasSuccessful == FALSE ) {
                 LOG(DEBUG_LEVEL_WARN, DBG_FILE_IN, "Unable to parse timecode on line: %s", line);
                 fclose(filePtr);
+                free(line);
                 return UNK_CAPTIONS_FILE;
             }
         }
     }
 
+    if( line ) {
+        free(line);
+    }
     fclose(filePtr);
 
     LOG(DEBUG_LEVEL_INFO, DBG_FILE_IN, "Caption Window for File: %s --- %02d:%02d:%02d;%02d to %02d:%02d:%02d;%02d ", fileNameStr,
@@ -293,6 +323,36 @@ FileType DetermineFileType( char* fileNameStr ) {
 /*----------------------------------------------------------------------------*/
 /*--                       Private Member Functions                         --*/
 /*----------------------------------------------------------------------------*/
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    shellQuote()
+ |
+ | DESCRIPTION:
+ |    Wraps a string in single quotes for /bin/sh, writing each embedded single
+ |    quote as '\'' so nothing in the string is interpreted by the shell.
+ |    Returns FALSE if the quoted string does not fit in the destination.
+ -------------------------------------------------------------------------------*/
+static boolean shellQuote( const char* srcStr, char* dstStr, size_t dstSize ) {
+    size_t used = 0;
+
+    if( dstSize < 3 ) return FALSE;
+    dstStr[used++] = '\'';
+    for( const char* charPtr = srcStr; *charPtr != '\0'; charPtr++ ) {
+        if( *charPtr == '\'' ) {
+            if( (used + 4) >= dstSize ) return FALSE;
+            memcpy(&dstStr[used], "'\\''", 4);
+            used = used + 4;
+        } else {
+            if( (used + 1) >= dstSize ) return FALSE;
+            dstStr[used++] = *charPtr;
+        }
+    }
+    if( (used + 2) > dstSize ) return FALSE;
+    dstStr[used++] = '\'';
+    dstStr[used] = '\0';
+    return TRUE;
+}  // shellQuote()
 
 #ifdef COMPILE_GPAC
 /*------------------------------------------------------------------------------
