@@ -1,6 +1,6 @@
-FROM debian:9-slim as base
+FROM debian:13-slim AS base
 
-ENV FFMPEG_VERSION=4.0.2 LD_LIBRARY_PATH=/usr/local/lib
+ENV FFMPEG_VERSION=8.1.2 LD_LIBRARY_PATH=/usr/local/lib
 
 RUN apt-get update
 
@@ -9,15 +9,18 @@ RUN apt-get install -y mediainfo
 
 # build ffmpeg libraries
 RUN apt-get install -y make curl gcc g++ nasm yasm && \
-  apt-get install -y opencl-dev vim libass-dev libavformat-dev \
-  libavutil-dev libavfilter-dev uuid-dev zlib1g-dev && \
-  DIR=$(mktemp -d) && cd ${DIR} && \
-  curl -s http://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz | tar zxvf - -C . && \
+  apt-get install -y vim libass-dev libavformat-dev \
+  libavutil-dev libavfilter-dev uuid-dev zlib1g-dev
+
+RUN DIR=$(mktemp -d) && cd ${DIR} && \
+  curl -fSL --retry 8 --retry-delay 3 --retry-all-errors --connect-timeout 30 -o ffmpeg.tar.gz https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz && \
+  tar zxf ffmpeg.tar.gz && \
   cd ffmpeg-${FFMPEG_VERSION} && \
   ./configure  --enable-version3 --enable-hardcoded-tables --enable-shared --enable-static \
-    --enable-small --enable-libass --enable-postproc --enable-avresample --enable-libfreetype \
-    --disable-lzma --enable-opencl --enable-pthreads && \
-  make && \
+    --enable-small --enable-libass --enable-libfreetype \
+    --disable-lzma --enable-pthreads \
+    --extra-cflags="-Wno-error=incompatible-pointer-types" && \
+  make -j$(nproc) && \
   make install && \
   make distclean && \
   rm -rf ${DIR}
@@ -38,66 +41,30 @@ COPY Makefile /app/Makefile
 WORKDIR /app
 RUN mkdir obj && mkdir python; cd src && make ci_with_gpac
 
-RUN ldd /usr/bin/mediainfo
+# Gather the runtime shared libraries into one directory with their symlink
+# chains intact (cp -a). Copying this directory into the runtime stage preserves
+# the links, whereas a wildcard COPY (lib.so.*) resolves them into regular files
+# and makes ldconfig warn "is not a symbolic link".
+RUN mkdir /runtime-libs && \
+    cp -a /usr/local/lib/libavformat.so* /usr/local/lib/libavcodec.so* \
+          /usr/local/lib/libavutil.so* /usr/local/lib/libswresample.so* \
+          /usr/local/lib/libgpac.so /runtime-libs/
 
-#
-# Runtime Container
-#
-FROM debian:9-slim as slim
+# --- RUNTIME STAGE ---
+FROM debian:13-slim AS runtime
 
-ENV FFMPEG_VERSION=4.0.2 LD_LIBRARY_PATH=/usr/local/lib
+ENV FFMPEG_VERSION=8.1.2 LD_LIBRARY_PATH=/usr/local/lib
 
 COPY --from=base /app/caption-inspector /usr/local/bin/
-# copy required libraries from base to the slim image
-COPY --from=base /usr/local/lib/libavformat.so.* /usr/local/lib/
-COPY --from=base /usr/local/lib/libavcodec.so.* /usr/local/lib/
-COPY --from=base /usr/local/lib/libavutil.so.* /usr/local/lib/
-COPY --from=base /usr/local/lib/libswresample.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libOpenCL.so.* /usr/local/lib/
-COPY --from=base /usr/local/lib/libgpac.so /usr/local/lib/
+COPY --from=base /runtime-libs/ /usr/local/lib/
 
-# ensure all required libraries are installed
-RUN if ldd /usr/local/bin/caption-inspector | grep "not found"; then false; fi
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        mediainfo \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=base /usr/bin/mediainfo /usr/local/bin/mediainfo
-# copy required libraries from base to the slim image
-COPY --from=base /usr/lib/x86_64-linux-gnu/libmediainfo.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libzen.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libcurl-gnutls.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libmms.so.* /usr/local/lib/
-COPY --from=base /lib/x86_64-linux-gnu/libglib-2.0.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libtinyxml2.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libnghttp2.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libidn2.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/librtmp.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libssh2.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libpsl.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libnettle.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libgnutls.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libkrb5.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libk5crypto.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/liblber-2.4.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libldap_r-2.4.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libunistring.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libhogweed.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libgmp.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libunistring.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libp11-kit.so.* /usr/local/lib/
-COPY --from=base /lib/x86_64-linux-gnu/libidn.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libtasn1.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libhogweed.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libgmp.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libkrb5support.so.* /usr/local/lib/
-COPY --from=base /lib/x86_64-linux-gnu/libkeyutils.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libkrb5support.so.* /usr/local/lib/
-COPY --from=base /lib/x86_64-linux-gnu/libkeyutils.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libkrb5support.so.* /usr/local/lib/
-COPY --from=base /lib/x86_64-linux-gnu/libkeyutils.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libsasl2.so.* /usr/local/lib/
-COPY --from=base /usr/lib/x86_64-linux-gnu/libffi.so.* /usr/local/lib/
+RUN ldconfig
 
-# ensure all required libraries are installed
-RUN if ldd /usr/local/bin/mediainfo | grep "not found"; then false; fi
+ENV FFMPEG_VERSION=8.1.2 LD_LIBRARY_PATH=/usr/local/lib
 
 ENTRYPOINT ["/usr/local/bin/caption-inspector"]
