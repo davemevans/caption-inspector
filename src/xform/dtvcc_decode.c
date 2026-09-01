@@ -40,6 +40,7 @@ static const char* ccTypeStr[4] = { "F1", "F2", "PD", "PS" };
 /*--                     Private Member Declarations                        --*/
 /*----------------------------------------------------------------------------*/
 
+static uint8 getPacketSize( const uint8 );
 static void processCurrentPacket( Context*, CaptionTime* );
 static uint16 countDataPackets( uint8*, uint8 );
 static void processServiceBlock( DtvccDecodeCtx*, uint8*, uint8, Buffer*, uint8, uint8 );
@@ -80,6 +81,7 @@ LinkInfo DtvccDecodeInitialize( Context* rootCtxPtr, boolean processOnly ) {
     ctxPtr->numP16Cmds = 0;
     ctxPtr->pktLenMismatches = 0;
     ctxPtr->dtvccPacketLength = 0;
+    ctxPtr->expectedPacketLength = 0;
     ctxPtr->lastSequence = DTVCC_NO_LAST_SEQUENCE;
     ctxPtr->activeServices = 0;
     for( int loop = 0; loop < DTVCC_MAX_NUM_SERVICES; loop++ ) {
@@ -159,29 +161,38 @@ uint8 DtvccDecodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
         ASSERT((loop+2) < inBuffer->numElements);
         boolean ccValid = ((inBuffer->dataPtr[loop] & CC_CONSTR_CC_VALID_FLAG_MASK) == CC_CONSTR_CC_VALID_FLAG_SET);
         uint8 ccType = inBuffer->dataPtr[loop] & CC_CONSTR_CC_TYPE_MASK;
+
+        boolean consumeData = FALSE;
         
         LOG( DEBUG_LEVEL_VERBOSE, DBG_708_DEC, "Construct %d : 0x%02X -> Type = %s Valid = %s : Data = %02X %02X",
             ((loop/3)+1), inBuffer->dataPtr[loop], ccTypeStr[ccType], trueFalseStr[ccValid], inBuffer->dataPtr[loop+1], inBuffer->dataPtr[loop+2] );
         
-        if( ccType == DTVCCC_CHANNEL_PACKET_START ) {
-            processCurrentPacket(rootCtxPtr, &inBuffer->captionTime);
-            ctxPtr->dtvccPacketLength = 0;
-            if( ccValid == TRUE ) {
-                if( (ctxPtr->dtvccPacketLength + 2) < DTVCC_MAX_PACKET_LENGTH ) {
-                    ctxPtr->dtvccPacket[ctxPtr->dtvccPacketLength++] = inBuffer->dataPtr[loop+1];
-                    ctxPtr->dtvccPacket[ctxPtr->dtvccPacketLength++] = inBuffer->dataPtr[loop+2];
-                } else {
-                    encodeTimeCode(&inBuffer->captionTime, captionTimeStr);
-                    LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "At %s Max Packet Length Exceeded, skipping new.", captionTimeStr);
+        if( ccValid == TRUE ) {
+            if( ccType == DTVCCC_CHANNEL_PACKET_START ) {
+                if ( ctxPtr->dtvccPacketLength ) {
+                    processCurrentPacket(rootCtxPtr, &inBuffer->captionTime);
+                    ctxPtr->dtvccPacketLength = 0;
                 }
+                ctxPtr->expectedPacketLength = getPacketSize(inBuffer->dataPtr[loop+1] & PACKET_LENGTH_MASK);
+                consumeData = TRUE;
+            } else if( ccType == DTVCCC_CHANNEL_PACKET_DATA) {
+                consumeData = TRUE;
             }
-        } else if( (ccValid == TRUE) && (ccType == DTVCCC_CHANNEL_PACKET_DATA) ) {
-            if( (ctxPtr->dtvccPacketLength + 2) < DTVCC_MAX_PACKET_LENGTH ) {
+        }
+
+        if( consumeData == TRUE ) {
+            if( (ctxPtr->dtvccPacketLength + 2) <= DTVCC_MAX_PACKET_LENGTH ) {
                 ctxPtr->dtvccPacket[ctxPtr->dtvccPacketLength++] = inBuffer->dataPtr[loop+1];
                 ctxPtr->dtvccPacket[ctxPtr->dtvccPacketLength++] = inBuffer->dataPtr[loop+2];
             } else {
                 encodeTimeCode(&inBuffer->captionTime, captionTimeStr);
                 LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "At %s Max Packet Length Exceeded, skipping new.", captionTimeStr);
+            }
+
+            if( ctxPtr->dtvccPacketLength && ctxPtr->expectedPacketLength && (ctxPtr->dtvccPacketLength >= ctxPtr->expectedPacketLength) ) {
+                processCurrentPacket(rootCtxPtr, &inBuffer->captionTime);
+                ctxPtr->dtvccPacketLength = 0;
+                ctxPtr->expectedPacketLength = 0;
             }
         }
     }
@@ -271,6 +282,13 @@ uint8 DtvccDecodeShutdown( void* rootCtxPtr ) {
 /*--                       Private Member Functions                         --*/
 /*----------------------------------------------------------------------------*/
 
+static uint8 getPacketSize(const uint8 packetSizeCode) {
+    if( packetSizeCode == 0 ) {
+        return 128;
+    }
+    return 2 * packetSizeCode;
+}
+
 /*------------------------------------------------------------------------------
  | NAME:
  |    processCurrentPacket()
@@ -327,14 +345,8 @@ static void processCurrentPacket( Context* rootCtxPtr, CaptionTime* captionTimeP
     }
 
     ctxPtr->firstPacket = FALSE;
-    uint8 packet_size;
-    if( packet_size_code == 0 ) {
-        packet_size = 128;
-    } else {
-        packet_size = 2 * packet_size_code;
-    }
-    
-    // packet_data_size = packet_size - 1
+    uint8 packet_size = getPacketSize(packet_size_code);
+
     if( ctxPtr->dtvccPacketLength != packet_size ) {
         encodeTimeCode(captionTimePtr, captionTimeStr);
         if( ctxPtr->pktLenMismatches < 5 ) {
@@ -359,6 +371,9 @@ static void processCurrentPacket( Context* rootCtxPtr, CaptionTime* captionTimeP
     
     uint8* packet_data = &ctxPtr->dtvccPacket[1];
     uint8 packetDataIndex = 0;
+    // Parse only the bytes that arrived. A packet cut short by the next packet start
+    // leaves the rest of the buffer holding bytes from an earlier packet.
+    uint8 packetDataSize = ((ctxPtr->dtvccPacketLength < packet_size) ? ctxPtr->dtvccPacketLength : packet_size) - 1;
     
     /*+-------------------------------------------------------------------------+----+-------+
       |                        Service Block Syntax                             |bits| value |
@@ -378,7 +393,7 @@ static void processCurrentPacket( Context* rootCtxPtr, CaptionTime* captionTimeP
       | }                                                                       |    |       |
       +-------------------------------------------------------------------------+----+-------+*/
     
-    while( (packetDataIndex < packet_size) && ((packet_size - packetDataIndex) > 1) ) {               // packet_data_size = packet_size - 1
+    while( packetDataIndex < packetDataSize ) {
         uint8 service_number = (packet_data[packetDataIndex] & SERVICE_NUMBER_MASK) >> SERVICE_NUMBER_SHIFT;     // 3 more significant bits
         uint8 block_size = (packet_data[packetDataIndex] & SERVICE_BLOCK_SIZE_MASK);                             // 5 less significant bits
         
@@ -386,7 +401,7 @@ static void processCurrentPacket( Context* rootCtxPtr, CaptionTime* captionTimeP
             char charArrayBig[256];
             char charArraySmall[10];
             sprintf(charArrayBig, "%02X - [ ", packet_data[packetDataIndex]);
-            for( int loop = 0; loop < block_size; loop++ ) {
+            for( int loop = 0; (loop < block_size) && ((packetDataIndex+1+loop) < packetDataSize); loop++ ) {
                 sprintf(charArraySmall, "%02X ", packet_data[(packetDataIndex+1)+loop]);
                 strcat(charArrayBig, charArraySmall);
             }
@@ -399,6 +414,11 @@ static void processCurrentPacket( Context* rootCtxPtr, CaptionTime* captionTimeP
         if( service_number == EXTENDED_SRV_NUM_PATTERN ) {
             ASSERT(block_size);
             packetDataIndex++;
+            if( packetDataIndex >= packetDataSize ) {
+                encodeTimeCode(captionTimePtr, captionTimeStr);
+                LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Packet at %s ends inside an extended service block header", captionTimeStr );
+                break;
+            }
             service_number = (packet_data[packetDataIndex] & EXTENDED_SRV_NUM_MASK);
             if( service_number < 7 ) {
                 encodeTimeCode(captionTimePtr, captionTimeStr);
@@ -412,6 +432,12 @@ static void processCurrentPacket( Context* rootCtxPtr, CaptionTime* captionTimeP
             LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Data received at %s for service 0, skipping rest of packet.", captionTimeStr);
             packetDataIndex = packet_size; // Move to end
             break;
+        }
+        if( (packetDataIndex + block_size) > packetDataSize ) {
+            encodeTimeCode(captionTimePtr, captionTimeStr);
+            LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Service block at %s runs past the end of the packet: %d bytes, %d left; decoding what arrived",
+                 captionTimeStr, block_size, packetDataSize - packetDataIndex );
+            block_size = packetDataSize - packetDataIndex;
         }
         uint16 numDataPackets = countDataPackets( &packet_data[packetDataIndex], block_size );
         Buffer* outBuffer = NewBuffer(BUFFER_TYPE_DTVCC, numDataPackets);
