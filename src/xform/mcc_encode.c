@@ -458,8 +458,11 @@ static uint8 handleSkew( Context* rootCtxPtr, CaptionTime* inCaptionTimePtr ) {
     } else if( (inCaptionTimePtr->frameRatePerSecTimesOneHundred / 100) == 25 ) {
         framerateHigh = 25;
         framerateLow = 25;
+    } else if( (inCaptionTimePtr->frameRatePerSecTimesOneHundred / 100) == 50 ) {
+        framerateHigh = 50;
+        framerateLow = 50;
     } else {
-        LOG(DEBUG_LEVEL_FATAL, DBG_MCC_ENC, "Unexpected and unhandled framerate: %ld", inCaptionTimePtr->frameRatePerSecTimesOneHundred);
+        LOG(DEBUG_LEVEL_FATAL, DBG_MCC_ENC, "Unexpected and unhandled framerate: %u", inCaptionTimePtr->frameRatePerSecTimesOneHundred);
     }
 
     if( (ctxPtr->lastCaptionTime.minute == inCaptionTimePtr->minute) && (ctxPtr->lastCaptionTime.second == inCaptionTimePtr->second) ) {
@@ -717,17 +720,20 @@ static Buffer* addBoilerplate( MccEncodeCtx* ctxPtr, Buffer* inBufferPtr ) {
     dataPtr[3] = 0; // cdp checksum
     dataPtr[4] = 0; // vanc checksum
 
-    //the arithmetic sum of the entire packet (first byte of cdp_identifier to packet_checksum, inclusive) modulo 256 equal zero.
+    // the arithmetic sum of the entire packet (first byte of cdp_identifier to packet_checksum, inclusive) modulo 256 equal zero.
     for( int loop = 3; loop < (inBufferPtr->numElements + 15); loop++ ) {
         dataPtr[3] = dataPtr[3] + outBufferPtr->dataPtr[loop];
     }
 
-    dataPtr[3] = (~dataPtr[3]) + 1;  //Two's complement value is the checksum
+    dataPtr[3] = (~dataPtr[3]) + 1;  // two's complement value is the checksum
 
-    for( int loop = 0; loop < 3; loop++ ) {
+    // ANC checksum should equal DID + SDID + DC because CDP checksum causes
+    // UDW to sum to 0, so the previous version was correct but calculate it
+    // over UDW so its correct even if CDP checksum is incorrect.
+    for( int loop = 0; loop < inBufferPtr->numElements + 16; loop++ ) {
         dataPtr[4] = dataPtr[4] + outBufferPtr->dataPtr[loop];
     }
-    
+
     FreeBuffer( inBufferPtr );
     ctxPtr->cdpHeaderSequence++;
     
