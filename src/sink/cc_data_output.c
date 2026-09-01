@@ -46,6 +46,7 @@ static const char* ccTypeStr[4] = { "1", "2", "D", "S" };
 /*----------------------------------------------------------------------------*/
 
 static uint16 add708Error( CcDataOutputCtx*, char* );
+static void appendText( char *, const char* );
 static void decode608Pair( CcDataOutputCtx*, uint8, uint8, uint8, CcdElemOut*, TextString* );
 static void decodePacketStart( CcDataOutputCtx*, uint8, uint8, CcdElemOut* );
 static void decodePacketData( CcDataOutputCtx*, uint8, char*, char*, TextString*, char* );
@@ -796,7 +797,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
             strcat(outputPtr->tagStr, " ");
         }
         ASSERT(strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
-        strcat(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeSpecialCharacter(ccData2 & SPCL_NA_CHAR_MASK));
+        appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeSpecialCharacter(ccData2 & SPCL_NA_CHAR_MASK));
     } else if( ((ccData1 == EXT_W_EURO_CHAR_SET_CH_1_3_SF) || (ccData1 == EXT_W_EURO_CHAR_SET_CH_1_3_FG) ||
                 (ccData1 == EXT_W_EURO_CHAR_SET_CH_2_4_SF) || (ccData1 == EXT_W_EURO_CHAR_SET_CH_2_4_FG)) &&
                ((ccData2 & EXT_W_EURO_CHAR_SET_MASK) == ccData2) ) {
@@ -829,7 +830,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                 strcat(outputPtr->tagStr, " ");
             }
             ASSERT(strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
-            strcat(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeExtendedCharacter(EXT_W_EURO_CHAR_SET_SPANISH_FRENCH, ccData2));
+            appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeExtendedCharacter(EXT_W_EURO_CHAR_SET_SPANISH_FRENCH, ccData2));
         } else {
             if( ccType == CC_DATA_TYPE__FIELD_1 ) {
                 channelNum = 2;
@@ -842,7 +843,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                 strcat(outputPtr->tagStr, " ");
             }
             ASSERT(strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
-            strcat(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeExtendedCharacter(EXT_W_EURO_CHAR_SET_DUTCH_GERMAN, ccData2));
+            appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeExtendedCharacter(EXT_W_EURO_CHAR_SET_DUTCH_GERMAN, ccData2));
         }
     } else if( (((ccData1 >= FIRST_BASIC_CHAR) && (ccData1 <= LAST_BASIC_CHAR)) || (ccData1 == NULL_BASIC_CHAR)) &&
                (((ccData2 >= FIRST_BASIC_CHAR) && (ccData2 <= LAST_BASIC_CHAR)) || (ccData2 == NULL_BASIC_CHAR)) ) {
@@ -871,8 +872,8 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                                Line21DecodeBasicNACharacter(ccData1), Line21DecodeBasicNACharacter(ccData2));
                 ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
             }
-            strcat(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData1));
-            strcat(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData2));
+            appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData1));
+            appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData2));
         } else if( (ccData1 != 0) && (ccData2 == 0) ) {
             if( strlen(Line21DecodeBasicNACharacter(ccData1)) == 1 ) {
                 len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d - \"%s\"", ctxPtr->currentChannel[ccType], Line21DecodeBasicNACharacter(ccData1));
@@ -887,7 +888,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                                Line21DecodeBasicNACharacter(ccData1));
                 ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
             }
-            strcat(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData1));
+            appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData1));
         } else {
             ASSERT(0);
         }
@@ -1570,7 +1571,7 @@ static void decodeExtCmdCode( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagSt
                         len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G2 - '%s'", DtvccDecodeG2CharSet(ccData));
                         ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
                     }
-                    strcat(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG2CharSet(ccData));
+                    appendText(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG2CharSet(ccData));
                 } else {
                     len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G2:2");
                     ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
@@ -1658,7 +1659,7 @@ static void decodeExtCmdCode( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagSt
                     ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
                     len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G3: '%s'", DtvccDecodeG3CharSet(ccData));
                     ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                    strcat(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG3CharSet(ccData));
+                    appendText(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG3CharSet(ccData));
                 } else {
                     len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G3:2");
                     ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
@@ -1674,6 +1675,23 @@ static void decodeExtCmdCode( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagSt
         }
     }
 }  // decodeExtCmdCode()
+
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    appendText()
+ |
+ | DESCRIPTION:
+ |    This function safely appends characters up to
+ |    MAX_CHARS_PER_LINE_PER_CHANNEL - 1, leaving room for NUL. Further appends
+ |    will be truncated silently.
+ -------------------------------------------------------------------------------*/
+static void appendText( char* dst, const char* src ) {
+    size_t len = strlen(dst);
+    if( len < MAX_CHARS_PER_LINE_PER_CHANNEL - 1 ) {
+        strncat(dst, src, MAX_CHARS_PER_LINE_PER_CHANNEL - 1 - len);
+    }
+}  // appendText()
 
 /*------------------------------------------------------------------------------
  | NAME:
