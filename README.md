@@ -22,26 +22,31 @@ and a [Closed Caption Descriptor Decode File](./docs/decodeCCD.md).
 Building and Running the Caption Inspector Executable Locally
 -------------------------------------------------------------
 
-Caption Inspector requires FFMPEG to be installed on your machine. Please download the appropriate
-version of FFMPEG from [here](https://ffmpeg.org/download.html) and install it in your machine.
-Caption Inspector is known to run with FFMPEG Version 4.0.2.
+Caption Inspector requires the FFmpeg libraries (libavformat, libavcodec and libavutil), which the build locates
+with `pkg-config`. FFmpeg 4.4 or later works, including for A/53 captions in HEVC video: the caption decoding tests
+pass with FFmpeg 4.4, 5.1, 6.1, 7.1 and 8.1. The Docker image builds a pinned FFmpeg 8.1.2 from source, so that its
+test results do not depend on a distribution's FFmpeg version.
 
-To install FFMPEG Version 4.0.2, follow the below list (for Mac), using the Dockerfile as a reference:
+On macOS, using [Homebrew](https://brew.sh):
 ```
-brew install nasm
-brew install yasm
-curl -s http://ffmpeg.org/releases/ffmpeg-4.0.2.tar.gz | tar zxvf - -C . 
-cd ffmpeg-4.0.2/
-./configure  --enable-version3 --enable-hardcoded-tables --enable-shared --enable-static --enable-small --enable-libass --enable-postproc --enable-avresample --enable-libfreetype --disable-lzma --enable-opencl --enable-pthreads
-make
-make install
-make distclean
+brew install ffmpeg
 ```
 
-While not required, Caption Inspector leverages a tool called MediaInfo to determine whether or not
-an asset is, or is not, Drop Frame. You can download the command line version of MediaInfo
-[here](https://mediaarea.net/en/MediaInfo/Download). Caption Inspector is known to run with
-MediaInfo Version 18.12 (found [here](https://mediaarea.net/download/binary/mediainfo/18.08/MediaInfo_CLI_18.08_Mac.dmg)).
+On Debian or Ubuntu:
+```
+sudo apt install clang gcc make pkg-config libavformat-dev libavcodec-dev libavutil-dev uuid-dev zlib1g-dev
+```
+
+If FFmpeg is installed where `pkg-config` does not look (for example a source build in a custom prefix), point
+`PKG_CONFIG_PATH` at its `lib/pkgconfig` directory. The Dockerfile shows how to build FFmpeg 8.1.2 from source.
+
+Caption Inspector leverages a tool called MediaInfo to determine whether or not an asset is, or is not,
+Drop Frame. Install the command line version with `brew install media-info` or `sudo apt install mediainfo`,
+or download it from [here](https://mediaarea.net/en/MediaInfo/Download). Without it, video assets are treated
+as non-Drop Frame unless set with `-d`. Drop Frame detection reads MediaInfo's "Time code of first frame", which
+older versions do not always report (MediaInfo 24.01 and 25.04 report it for the H.264 test asset, 23.04 does
+not); use a recent version, or set it with `-d`. The test suite needs it: the video test masters were generated
+with Drop Frame detected, so the tests fail without MediaInfo or with a version that does not report it.
 
 ```
 make caption-inspector
@@ -123,6 +128,17 @@ Xunit Viewer installed, or if you ignore it, you just need to build and run the 
 cd test
 make test
 ```
+
+The local test build omits MOV/MP4 (GPAC) support by default, so it builds without any extra dependencies. If you have
+built and installed the GPAC caption extractor (see [Building ... with MOV Support](#building-the-caption-inspector-executable-locally-with-mov-support)
+above, whose `make install` places it under `/usr/local`), you can include it in the test build:
+
+```
+cd test
+make test WITH_GPAC=1
+```
+
+The Docker test build (`make docker-test`) always includes GPAC.
 
 The tests are a mix of C and Python, depending on which made more sense for the specific test. The build system will
 aggregate all of the results from the tests in both languages.
