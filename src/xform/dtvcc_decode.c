@@ -40,6 +40,7 @@ static const char* ccTypeStr[4] = { "F1", "F2", "PD", "PS" };
 /*--                     Private Member Declarations                        --*/
 /*----------------------------------------------------------------------------*/
 
+static uint8 getPacketSize( const uint8 );
 static void processCurrentPacket( Context*, CaptionTime* );
 static uint16 countDataPackets( uint8*, uint8 );
 static void processServiceBlock( DtvccDecodeCtx*, uint8*, uint8, Buffer*, uint8, uint8 );
@@ -80,6 +81,7 @@ LinkInfo DtvccDecodeInitialize( Context* rootCtxPtr, boolean processOnly ) {
     ctxPtr->numP16Cmds = 0;
     ctxPtr->pktLenMismatches = 0;
     ctxPtr->dtvccPacketLength = 0;
+    ctxPtr->expectedPacketLength = 0;
     ctxPtr->lastSequence = DTVCC_NO_LAST_SEQUENCE;
     ctxPtr->activeServices = 0;
     for( int loop = 0; loop < DTVCC_MAX_NUM_SERVICES; loop++ ) {
@@ -159,29 +161,38 @@ uint8 DtvccDecodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
         ASSERT((loop+2) < inBuffer->numElements);
         boolean ccValid = ((inBuffer->dataPtr[loop] & CC_CONSTR_CC_VALID_FLAG_MASK) == CC_CONSTR_CC_VALID_FLAG_SET);
         uint8 ccType = inBuffer->dataPtr[loop] & CC_CONSTR_CC_TYPE_MASK;
+
+        boolean consumeData = FALSE;
         
         LOG( DEBUG_LEVEL_VERBOSE, DBG_708_DEC, "Construct %d : 0x%02X -> Type = %s Valid = %s : Data = %02X %02X",
             ((loop/3)+1), inBuffer->dataPtr[loop], ccTypeStr[ccType], trueFalseStr[ccValid], inBuffer->dataPtr[loop+1], inBuffer->dataPtr[loop+2] );
         
-        if( ccType == DTVCCC_CHANNEL_PACKET_START ) {
-            processCurrentPacket(rootCtxPtr, &inBuffer->captionTime);
-            ctxPtr->dtvccPacketLength = 0;
-            if( ccValid == TRUE ) {
-                if( (ctxPtr->dtvccPacketLength + 2) < DTVCC_MAX_PACKET_LENGTH ) {
-                    ctxPtr->dtvccPacket[ctxPtr->dtvccPacketLength++] = inBuffer->dataPtr[loop+1];
-                    ctxPtr->dtvccPacket[ctxPtr->dtvccPacketLength++] = inBuffer->dataPtr[loop+2];
-                } else {
-                    encodeTimeCode(&inBuffer->captionTime, captionTimeStr);
-                    LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "At %s Max Packet Length Exceeded, skipping new.", captionTimeStr);
+        if( ccValid == TRUE ) {
+            if( ccType == DTVCCC_CHANNEL_PACKET_START ) {
+                if ( ctxPtr->dtvccPacketLength ) {
+                    processCurrentPacket(rootCtxPtr, &inBuffer->captionTime);
+                    ctxPtr->dtvccPacketLength = 0;
                 }
+                ctxPtr->expectedPacketLength = getPacketSize(inBuffer->dataPtr[loop+1] & PACKET_LENGTH_MASK);
+                consumeData = TRUE;
+            } else if( ccType == DTVCCC_CHANNEL_PACKET_DATA) {
+                consumeData = TRUE;
             }
-        } else if( (ccValid == TRUE) && (ccType == DTVCCC_CHANNEL_PACKET_DATA) ) {
+        }
+
+        if( consumeData == TRUE ) {
             if( (ctxPtr->dtvccPacketLength + 2) < DTVCC_MAX_PACKET_LENGTH ) {
                 ctxPtr->dtvccPacket[ctxPtr->dtvccPacketLength++] = inBuffer->dataPtr[loop+1];
                 ctxPtr->dtvccPacket[ctxPtr->dtvccPacketLength++] = inBuffer->dataPtr[loop+2];
             } else {
                 encodeTimeCode(&inBuffer->captionTime, captionTimeStr);
                 LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "At %s Max Packet Length Exceeded, skipping new.", captionTimeStr);
+            }
+
+            if( ctxPtr->dtvccPacketLength && ctxPtr->expectedPacketLength && (ctxPtr->dtvccPacketLength >= ctxPtr->expectedPacketLength) ) {
+                processCurrentPacket(rootCtxPtr, &inBuffer->captionTime);
+                ctxPtr->dtvccPacketLength = 0;
+                ctxPtr->expectedPacketLength = 0;
             }
         }
     }
@@ -271,6 +282,13 @@ uint8 DtvccDecodeShutdown( void* rootCtxPtr ) {
 /*--                       Private Member Functions                         --*/
 /*----------------------------------------------------------------------------*/
 
+static uint8 getPacketSize(const uint8 packetSizeCode) {
+    if( packetSizeCode == 0 ) {
+        return 128;
+    }
+    return 2 * packetSizeCode;
+}
+
 /*------------------------------------------------------------------------------
  | NAME:
  |    processCurrentPacket()
@@ -327,14 +345,8 @@ static void processCurrentPacket( Context* rootCtxPtr, CaptionTime* captionTimeP
     }
 
     ctxPtr->firstPacket = FALSE;
-    uint8 packet_size;
-    if( packet_size_code == 0 ) {
-        packet_size = 128;
-    } else {
-        packet_size = 2 * packet_size_code;
-    }
-    
-    // packet_data_size = packet_size - 1
+    uint8 packet_size = getPacketSize(packet_size_code);
+
     if( ctxPtr->dtvccPacketLength != packet_size ) {
         encodeTimeCode(captionTimePtr, captionTimeStr);
         if( ctxPtr->pktLenMismatches < 5 ) {

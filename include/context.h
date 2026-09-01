@@ -182,6 +182,7 @@ typedef struct {
     boolean isTickerCaptioning[DTVCC_MAX_NUM_SERVICES];
     boolean captioningChange[DTVCC_MAX_NUM_SERVICES];
     boolean captioningStart[DTVCC_MAX_NUM_SERVICES];
+    uint8 expectedPacketLength;
 } DtvccDecodeCtx;
 
 typedef struct {
