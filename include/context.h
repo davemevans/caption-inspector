@@ -227,6 +227,8 @@ typedef struct {
     uint8 cea708State;
     uint8 cea708Code;
     uint8 cea708BytesRemaining;
+    uint8 cea708PacketBytesRemaining;
+    uint8 cea708BlockBytesRemaining;
     char ccdFileName[MAX_FILE_NAME_LEN];
 } CcDataOutputCtx;
 

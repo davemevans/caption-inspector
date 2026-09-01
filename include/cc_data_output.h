@@ -41,17 +41,20 @@
 #define NUM_CC_DATA_ELEMENTS_PER_LINE                            5
 
 #define NUM_608_CHANNELS                                         4
-#define NUM_708_SERVICES                                        16
+#define NUM_708_SERVICES                                        63
+#define EXTENDED_SRV_NUM_MIN                                     7
 #define MAX_CHARS_PER_LINE_PER_CHANNEL                          64
 
 #define CEA708_ERROR_STR_SIZE                                   25
 
 #define CEA708_STATE_UNKNOWN                                     0
-#define CEA708_STATE_EXTENDED_SEQ_NUM                            1
+#define CEA708_STATE_EXTENDED_SRV_NUM                            1
 #define CEA708_STATE_DATA_WAIT                                   2
 #define CEA708_STATE_C0_CODE                                     3
 #define CEA708_STATE_C1_CODE                                     4
 #define CEA708_STATE_EXTENDED_CODE                               5
+#define CEA708_STATE_PACKET_HEADER_WAIT                          6
+#define CEA708_STATE_BLOCK_HEADER_WAIT                           7
 
 #define CEA708_CODE_UNKNOWN                                      0
 #define CEA708_CODE_UNKNOWN_C0_1                                 1
