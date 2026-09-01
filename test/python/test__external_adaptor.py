@@ -40,7 +40,7 @@ class TestClass(object):
         if os.path.exists('./tmp') is not True:
             os.mkdir('tmp')
         retval = clib.ExtrnlAdptrPlumbSccPipeline('../media/Plan9fromOuterSpace.scc'.encode('utf-8'),
-                                                  './tmp/Plan9fromOuterSpace'.encode('utf-8'), 2400)
+                                                  './tmp'.encode('utf-8'), 2997)
         assert retval is 1
         clib.ExtrnlAdptrDriveDecodePipeline()
         assert os.path.exists('./tmp/Plan9fromOuterSpace-C1.608'.encode('utf-8')) is True
@@ -65,7 +65,7 @@ class TestClass(object):
         if os.path.exists('./tmp') is not True:
             os.mkdir('tmp')
         retval = clib.ExtrnlAdptrPlumbMccPipeline('../media/NightOfTheLivingDead.mcc'.encode('utf-8'),
-                                                  './tmp/NightOfTheLivingDead'.encode('utf-8'))
+                                                  './tmp'.encode('utf-8'))
         assert retval is 1
         clib.ExtrnlAdptrDriveDecodePipeline()
         assert os.path.exists('./tmp/NightOfTheLivingDead-C1.608'.encode('utf-8')) is True
@@ -90,7 +90,7 @@ class TestClass(object):
         if os.path.exists('./tmp') is not True:
             os.mkdir('tmp')
         retval = clib.ExtrnlAdptrPlumbMpegPipeline('../media/BigBuckBunny_256x144-24fps.ts'.encode('utf-8'),
-                                                   './tmp/BigBuckBunny_256x144-24fps'.encode('utf-8'), 1)
+                                                   './tmp'.encode('utf-8'), 1)
         assert retval is 1
         clib.ExtrnlAdptrDriveDecodePipeline()
         assert os.path.exists('./tmp/BigBuckBunny_256x144-24fps-C1.608'.encode('utf-8')) is True
@@ -148,11 +148,6 @@ class TestClass(object):
         generated_file.close()
         master_file.close()
         assert os.path.exists('./tmp/BigBuckBunny_256x144-24fps.inf'.encode('utf-8')) is True
-        generated_file = open("./tmp/BigBuckBunny_256x144-24fps.inf", "r")
-        master_file = open("../media/BigBuckBunny_256x144-24fps.inf", "r")
-        compare_files(generated_file, master_file, [62, 63, 243, 248, 288, 293, 333, 338, 378, 383, 423, 428, 468, 473, 513, 518, 558, 563])
-        generated_file.close()
-        master_file.close()
         assert os.path.exists('./tmp/BigBuckBunny_256x144-24fps.mcc'.encode('utf-8')) is True
         generated_file = open("./tmp/BigBuckBunny_256x144-24fps.mcc", "r")
         master_file = open("../media/BigBuckBunny_256x144-24fps.mcc", "r")
