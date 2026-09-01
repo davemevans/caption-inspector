@@ -1,0 +1,23 @@
+# Keep the build context to tracked sources and test masters.
+.git
+.venv
+.idea
+**/.DS_Store
+obj/
+caption-inspector
+python/*.dylib
+*.dbg
+# Documentation is not needed to build or test
+docs/
+
+# Generated test binaries and results
+test/utest__*_c
+test/itest__buffer_utils
+test/itest__pipeline_utils
+test/*.xml
+test/*.html
+test/python/*.dylib
+test/python/*.xml
+test/python/*.html
+test/python/tmp
+test/python/__pycache__
