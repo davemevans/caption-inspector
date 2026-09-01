@@ -14,6 +14,7 @@ test/python/__pycache__/*
 cmake-build-debug/
 *__debug_log.txt
 test/python/libci-test.1.0.0.dylib
+test/python/libci.1.0.0.dylib
 test/python/*.xml
 test/python/*.html
 test/*.xml
@@ -23,5 +24,8 @@ test/utest__cc_utils_c
 test/utest__external_adaptor_c
 test/utest__output_utils_c
 test/utest__pipeline_utils_c
+test/utest__types_c
+test/utest__cc_data_output_c
+test/utest__mcc_decode_c
 test/itest__buffer_utils
 test/itest__pipeline_utils
