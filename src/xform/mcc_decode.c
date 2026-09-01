@@ -42,7 +42,7 @@ static Buffer* decodeMccLine( MccDecodeCtx*, Buffer* );
 static uint8 mccCharCount( char );
 static void addMultipleFaZeroZero( uint8, uint8*, uint16* );
 static void expandMccCode( uint8, uint8*, uint16* );
-static void decodeFrameRate( cdp_header, CaptionTime* );
+static void decodeFrameRate( MccDecodeCtx*, cdp_header, CaptionTime* );
 
 /*----------------------------------------------------------------------------*/
 /*--                       Public Member Functions                          --*/
@@ -70,6 +70,7 @@ LinkInfo MccDecodeInitialize( Context* rootCtxPtr ) {
     rootCtxPtr->mccDecodeCtxPtr = malloc(sizeof(MccDecodeCtx));
 
     rootCtxPtr->mccDecodeCtxPtr->numCcCountMismatches = 0;
+    rootCtxPtr->mccDecodeCtxPtr->numFrameRateMismatches = 0;
 
     InitSinks(&rootCtxPtr->mccDecodeCtxPtr->sinks, MCC_DATA___CC_DATA);
 
@@ -134,7 +135,13 @@ uint8 MccDecodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
     
     Buffer* expandedBuffer = expandMccLine( inBuffer );
     Buffer* decodedBuffer = decodeMccLine( ((Context*)rootCtxPtr)->mccDecodeCtxPtr, expandedBuffer );
-    
+
+    // decodeMccLine() returns NULL (having freed its input) when the line is too
+    // short to decode safely; drop it and keep processing the rest of the file.
+    if( decodedBuffer == NULL ) {
+        return PIPELINE_SUCCESS;
+    }
+
     return PassToSinks(rootCtxPtr, decodedBuffer, &((Context*)rootCtxPtr)->mccDecodeCtxPtr->sinks);
 }  // MccDecodeProcNextBuffer()
 
@@ -162,6 +169,10 @@ uint8 MccDecodeShutdown( void* rootCtxPtr ) {
 
     if( ((Context*)rootCtxPtr)->mccDecodeCtxPtr->numCcCountMismatches > 6 ) {
         LOG(DEBUG_LEVEL_INFO, DBG_MCC_DEC, "Suppressed %d additional occurrences of the warning for CC Count Mismatches", ((Context*)rootCtxPtr)->mccDecodeCtxPtr->numCcCountMismatches - 6);
+    }
+
+    if( ((Context*)rootCtxPtr)->mccDecodeCtxPtr->numFrameRateMismatches > 1 ) {
+        LOG(DEBUG_LEVEL_INFO, DBG_MCC_DEC, "Suppressed %d additional occurrences of the error for Frame Rate Mismatches", ((Context*)rootCtxPtr)->mccDecodeCtxPtr->numFrameRateMismatches - 1);
     }
 
     free(((Context*)rootCtxPtr)->mccDecodeCtxPtr);
@@ -267,6 +278,19 @@ static Buffer* expandMccLine( Buffer* buffPtr ) {
 
 /*------------------------------------------------------------------------------
  | NAME:
+ |    bytesRemain()
+ |
+ | DESCRIPTION:
+ |    Returns TRUE when at least 'needed' bytes are available from 'ptr' up to
+ |    'endPtr'. Used by decodeMccLine() to keep field widths taken from the
+ |    (possibly malformed) input from driving reads past the end of the buffer.
+ -------------------------------------------------------------------------------*/
+static boolean bytesRemain( const uint8* ptr, const uint8* endPtr, size_t needed ) {
+    return (ptr <= endPtr) && ((size_t)(endPtr - ptr) >= needed);
+}  // bytesRemain()
+
+/*------------------------------------------------------------------------------
+ | NAME:
  |    decodeMccLine()
  |
  | DESCRIPTION:
@@ -290,9 +314,17 @@ static Buffer* decodeMccLine( MccDecodeCtx* ctxPtr, Buffer* buffPtr ) {
     boolean srvcInfoSectionPresent = FALSE;
     
     uint8* tmpPtr = buffPtr->dataPtr;
-    
+    uint8* endPtr = buffPtr->dataPtr + buffPtr->numElements;
+
+    // ANC packet header: DID, SDID, DC.
+    if( !bytesRemain(tmpPtr, endPtr, 3) ) {
+        LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Truncated MCC line: %d bytes cannot hold an ANC packet header", buffPtr->numElements);
+        FreeBuffer(buffPtr);
+        return NULL;
+    }
+
     ANC_packet* ancPacketPtr = (ANC_packet*)tmpPtr;
-    
+
     if( ancPacketPtr->did != ANC_DID_CLOSED_CAPTIONING ) {
         LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Unexepected DID: 0x%02X vs 0x%02X", ancPacketPtr->did, ANC_DID_CLOSED_CAPTIONING);
     }
@@ -302,8 +334,16 @@ static Buffer* decodeMccLine( MccDecodeCtx* ctxPtr, Buffer* buffPtr ) {
     }
     
     dataCount = ancPacketPtr->dc;
-    
+
     tmpPtr = tmpPtr + 3;
+
+    // CDP header: identifier(2), length(1), frame rate(1), flags(1), sequence(2).
+    if( !bytesRemain(tmpPtr, endPtr, 7) ) {
+        LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Truncated MCC line: %d bytes cannot hold a CDP header", buffPtr->numElements);
+        FreeBuffer(buffPtr);
+        return NULL;
+    }
+
     cdp_header captionDataPacketHeader;
     captionDataPacketHeader.cdp_identifier = (tmpPtr[0] << 8) | tmpPtr[1];
     captionDataPacketHeader.cdp_length = tmpPtr[2];
@@ -327,7 +367,7 @@ static Buffer* decodeMccLine( MccDecodeCtx* ctxPtr, Buffer* buffPtr ) {
         LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Mismatch in length: 0x%02X vs 0x%02X", captionDataPacketHeader.cdp_length, dataCount);
     }
     
-    decodeFrameRate( captionDataPacketHeader, &buffPtr->captionTime );
+    decodeFrameRate( ctxPtr, captionDataPacketHeader, &buffPtr->captionTime );
     
     if( captionDataPacketHeader.time_code_present == TRUE ) {
         timeCodeSectionPresent = TRUE;
@@ -349,16 +389,29 @@ static Buffer* decodeMccLine( MccDecodeCtx* ctxPtr, Buffer* buffPtr ) {
     tmpPtr = tmpPtr + 7;
     
     if( timeCodeSectionPresent == TRUE ) {
+        if( !bytesRemain(tmpPtr, endPtr, sizeof(time_code_section) - 1) ) {
+            LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Truncated MCC line: not enough bytes for the Time Code Section");
+            FreeBuffer(buffPtr);
+            return NULL;
+        }
+
         time_code_section timeCodeSection;
         timeCodeSection.time_code_section_id = tmpPtr[0];
-        
+
         if( timeCodeSection.time_code_section_id != TIME_CODE_ID ) {
             LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Invalid Time Code ID: 0x%02X vs 0x%02X", timeCodeSection.time_code_section_id, TIME_CODE_ID);
         }
-        
+
         tmpPtr = tmpPtr + sizeof(time_code_section) - 1;
     }
-    
+
+    // ccdata_section header: id(1), cc_count(1).
+    if( !bytesRemain(tmpPtr, endPtr, 2) ) {
+        LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Truncated MCC line: not enough bytes for the CC Data Section header");
+        FreeBuffer(buffPtr);
+        return NULL;
+    }
+
     ccdata_section ccData;
     ccData.ccdata_id = tmpPtr[0];
     ccData.marker_bits = (tmpPtr[1] & 0xE0) >> 5;
@@ -382,34 +435,88 @@ static Buffer* decodeMccLine( MccDecodeCtx* ctxPtr, Buffer* buffPtr ) {
         ctxPtr->numCcCountMismatches++;
     }
     
+    // The CC constructs are read straight out of the buffer, so cc_count (5 bits
+    // of untrusted input) must not run the copy past the end of the decoded bytes.
+    if( (ccData.cc_count == 0) || !bytesRemain(tmpPtr, endPtr, ccData.cc_count * sizeof(cc_construct)) ) {
+        LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Truncated MCC line: %d CC constructs do not fit in %d bytes", ccData.cc_count, buffPtr->numElements);
+        FreeBuffer(buffPtr);
+        return NULL;
+    }
+
     Buffer* outputBuffer = NewBuffer(BUFFER_TYPE_BYTES, (ccData.cc_count * sizeof(cc_construct)));
     outputBuffer->captionTime = buffPtr->captionTime;
     outputBuffer->numElements = (ccData.cc_count * sizeof(cc_construct));
-    
+
     memcpy(outputBuffer->dataPtr, tmpPtr, (ccData.cc_count * sizeof(cc_construct)));
-    
+
     tmpPtr = tmpPtr + (ccData.cc_count * (sizeof(cc_construct)));
 
+    // The CC constructs (the actual payload) have been captured above. The footer
+    // and checksum validations below are best-effort: if the section walk driven by
+    // the input counts has run out of bytes, skip them rather than read past the end.
     if( srvcInfoSectionPresent == TRUE ) {
-        ccsvcinfo_section srvcInfo;
-        srvcInfo.ccsvcinfo_id = tmpPtr[0];
-        srvcInfo.svc_count = (tmpPtr[1] & 0x0F);
- 
-        if( srvcInfo.ccsvcinfo_id != CCS_SVCINFO_ID ) {
-            LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Invalid Srvc Info ID: 0x%02X vs 0x%02X", srvcInfo.ccsvcinfo_id, CCS_SVCINFO_ID);
+        if( bytesRemain(tmpPtr, endPtr, 2) ) {
+            ccsvcinfo_section srvcInfo;
+            srvcInfo.ccsvcinfo_id = tmpPtr[0];
+            srvcInfo.svc_count = (tmpPtr[1] & 0x0F);
+
+            if( srvcInfo.ccsvcinfo_id != CCS_SVCINFO_ID ) {
+                LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Invalid Srvc Info ID: 0x%02X vs 0x%02X", srvcInfo.ccsvcinfo_id, CCS_SVCINFO_ID);
+            }
+
+            // 2 Byte Preamble + (Number of Services * 7 Bytes)
+            tmpPtr = tmpPtr + 2 + (7 * srvcInfo.svc_count);
+        } else {
+            LOG(DEBUG_LEVEL_WARN, DBG_MCC_DEC, "Truncated MCC line: not enough bytes for the Service Info Section");
+        }
+    }
+
+    // CDP footer: id(1), sequence(2), checksum(1).
+    if( bytesRemain(tmpPtr, endPtr, 4) ) {
+        cdp_footer cdpFooter;
+        cdpFooter.cdp_footer_id = tmpPtr[0];
+        cdpFooter.cdp_ftr_sequence_cntr = (tmpPtr[1] << 8) | tmpPtr[2];
+        cdpFooter.packet_checksum = tmpPtr[3];
+
+        if( cdpFooter.cdp_footer_id != CDP_FOOTER_ID ) {
+            LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Invalid CDP Footer ID: 0x%02X vs 0x%02X", cdpFooter.cdp_footer_id, CDP_FOOTER_ID);
         }
 
-        // 2 Byte Preamble + (Number of Services * 7 Bytes)
-        tmpPtr = tmpPtr + 2 + (7 * srvcInfo.svc_count);
+        if( cdpFooter.cdp_ftr_sequence_cntr != captionDataPacketHeader.cdp_hdr_sequence_cntr) {
+            LOG(DEBUG_LEVEL_WARN, DBG_MCC_DEC, "Mismatched sequence counters: header %d vs footer %d", captionDataPacketHeader.cdp_hdr_sequence_cntr, cdpFooter.cdp_ftr_sequence_cntr);
+        }
+
+        // check CDP footer CS (arithmetic sum of the whole CDP, modulo 256, is zero)
+        if( (captionDataPacketHeader.cdp_length >= 1) &&
+            bytesRemain(buffPtr->dataPtr + 3, endPtr, captionDataPacketHeader.cdp_length - 1) ) {
+            uint8 cdp_footer_cs = 0;
+            for( int loop = 0; loop < captionDataPacketHeader.cdp_length - 1; loop++ ) {
+                cdp_footer_cs = cdp_footer_cs + buffPtr->dataPtr[3 + loop];
+            }
+            cdp_footer_cs = (~cdp_footer_cs) + 1;
+
+            if( cdpFooter.packet_checksum != cdp_footer_cs ) {
+                LOG(DEBUG_LEVEL_WARN, DBG_MCC_DEC, "Invalid CDP checksum: calculated %d, actual %d", cdp_footer_cs, cdpFooter.packet_checksum);
+            }
+        }
+
+        tmpPtr = tmpPtr + 4;
+    } else {
+        LOG(DEBUG_LEVEL_WARN, DBG_MCC_DEC, "Truncated MCC line: not enough bytes for the CDP Footer");
     }
-    
-    cdp_footer cdpFooter;
-    cdpFooter.cdp_footer_id = tmpPtr[0];
-    
-    if( cdpFooter.cdp_footer_id != CDP_FOOTER_ID ) {
-        LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Invalid CDP Footer ID: 0x%02X vs 0x%02X", cdpFooter.cdp_footer_id, CDP_FOOTER_ID);
+
+    // check SMPTE 291 ANC CS
+    if( bytesRemain(buffPtr->dataPtr, endPtr, dataCount + 3) && bytesRemain(tmpPtr, endPtr, 1) ) {
+        uint8 anc_cs = 0;
+        for( int loop = 0; loop < dataCount + 3; loop++ ) {
+            anc_cs = anc_cs + buffPtr->dataPtr[loop];
+        }
+
+        if( tmpPtr[0] != anc_cs ) {
+            LOG(DEBUG_LEVEL_WARN, DBG_MCC_DEC, "Invalid ANC checksum: calculated %d, actual %d", anc_cs, tmpPtr[0]);
+        }
     }
-    
+
     FreeBuffer(buffPtr);
 
     ASSERT(outputBuffer->numElements <= outputBuffer->maxNumElements);
@@ -678,7 +785,7 @@ static void expandMccCode( uint8 code, uint8* lineBytesPtr, uint16* numLineBytes
  |    This function decodes the cdp_frame_rate from the Caption Distribution Packet
  |    (CDP) Defintion. SMPTE ST 334-2:2015 - Revision of SMPTE 334-2-2007
  -------------------------------------------------------------------------------*/
-static void decodeFrameRate( cdp_header captionDataPacketHeader, CaptionTime* captionsTimePtr ) {
+static void decodeFrameRate( MccDecodeCtx* ctxPtr, cdp_header captionDataPacketHeader, CaptionTime* captionsTimePtr ) {
     ASSERT(captionsTimePtr);
     uint32 frameRatePerSecTimesOneThousand;
     
@@ -714,9 +821,16 @@ static void decodeFrameRate( cdp_header captionDataPacketHeader, CaptionTime* ca
     
     if( captionsTimePtr->frameRatePerSecTimesOneHundred == 0 ) {
         captionsTimePtr->frameRatePerSecTimesOneHundred = frameRatePerSecTimesOneThousand;
-        LOG(DEBUG_LEVEL_INFO, DBG_MCC_DEC, "Frame Rate: %d.%d", (frameRatePerSecTimesOneThousand / 100), (frameRatePerSecTimesOneThousand % 100) );
-    } else if( captionsTimePtr->frameRatePerSecTimesOneHundred == frameRatePerSecTimesOneThousand ) {
-        LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Frame Rate Mismatch: %d.%d vs. %d.%d", (frameRatePerSecTimesOneThousand / 100), (frameRatePerSecTimesOneThousand % 100),
-            (captionsTimePtr->frameRatePerSecTimesOneHundred / 100), (captionsTimePtr->frameRatePerSecTimesOneHundred % 100) );
+        LOG(DEBUG_LEVEL_INFO, DBG_MCC_DEC, "Frame Rate: %d.%02d", (frameRatePerSecTimesOneThousand / 100), (frameRatePerSecTimesOneThousand % 100) );
+    } else if( (captionsTimePtr->frameRatePerSecTimesOneHundred != frameRatePerSecTimesOneThousand) &&
+               !((captionsTimePtr->frameRatePerSecTimesOneHundred == 2400) && (frameRatePerSecTimesOneThousand == 2397)) ) {
+        // The header's Time Code Rate distinguishes 30 from 30DF (29.97), but has no value for
+        // 23.976, which is written as 24; that is the only mismatch the format forces.
+        if( ctxPtr->numFrameRateMismatches == 0 ) {
+            LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Frame Rate Mismatch: CDP %d.%02d vs. Time Code Rate %d.%02d --- Suppressing Subsequent Errors.",
+                (frameRatePerSecTimesOneThousand / 100), (frameRatePerSecTimesOneThousand % 100),
+                (captionsTimePtr->frameRatePerSecTimesOneHundred / 100), (captionsTimePtr->frameRatePerSecTimesOneHundred % 100) );
+        }
+        ctxPtr->numFrameRateMismatches++;
     }
 }  // decodeFrameRate()

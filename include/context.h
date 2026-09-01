@@ -187,6 +187,7 @@ typedef struct {
 typedef struct {
     Sinks sinks;
     uint32 numCcCountMismatches;
+    uint32 numFrameRateMismatches;
 } MccDecodeCtx;
 
 typedef struct {
