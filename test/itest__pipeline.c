@@ -1100,7 +1100,6 @@ LinkInfo CcDataOutInitialize( Context* rootCtxPtr ) {
     TEST_ASSERT(!rootCtxPtr->ccDataOutputCtxPtr);
 
     rootCtxPtr->ccDataOutputCtxPtr = malloc(sizeof(CcDataOutputCtx));
-    CcDataOutputCtx* ctxPtr = rootCtxPtr->ccDataOutputCtxPtr;
 
     LinkInfo linkInfo;
     linkInfo.linkType = CC_DATA___TEXT_FILE;
@@ -1142,7 +1141,6 @@ LinkInfo DtvccOutInitialize( Context* rootCtxPtr, char* outputFileNameStr, boole
     TEST_ASSERT(!rootCtxPtr->dtvccOutputCtxPtr);
 
     rootCtxPtr->dtvccOutputCtxPtr = malloc(sizeof(DtvccOutputCtx));
-    DtvccOutputCtx* ctxPtr = rootCtxPtr->dtvccOutputCtxPtr;
 
     LinkInfo linkInfo;
     linkInfo.linkType = DTVCC_DATA___TEXT_FILE;

@@ -48,7 +48,7 @@ static struct timespec startTime;
 /*----------------------------------------------------------------------------*/
 
 static void printHelp( void );
-static void printVersion();
+static void printVersion( void );
 
 static char* executibleName;
  

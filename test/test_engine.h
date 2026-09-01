@@ -67,7 +67,8 @@
 #define TEST_END } \
                  if( CheckError(jmpBufNum) == FALSE ) isSuccessful = FALSE; \
                  if( isSuccessful == TRUE ) (*numSuccessfulPtr)++; \
-                 else (*numFailedPtr)++; LogTestCase( isSuccessful );
+                 else (*numFailedPtr)++; \
+                 LogTestCase( isSuccessful );
 
 #define ASSERT_STREQ(expected, actual) if( AssertStringEqual(__FILE__, __LINE__, expected, actual) == FALSE) isSuccessful = FALSE
 #define ASSERT_PTREQ(expected, actual) if( AssertPointerEqual(__FILE__, __LINE__, expected, actual) == FALSE) isSuccessful = FALSE
