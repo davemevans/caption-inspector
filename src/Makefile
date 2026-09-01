@@ -117,14 +117,22 @@ OBJS_IN_OBJ_DIR = $(foreach OBJS, $(OBJS), ../obj/$(OBJS))
 
 ifeq ($(UNAME), Linux)
 C_FLAGS = -Wpedantic -Wno-deprecated-declarations -Wall -fno-strict-aliasing -fPIC -DPIC
-SO_FLAGS = -shared -W -L/usr/local/lib -lavformat -lavcodec -lavutil -luuid
+SO_FLAGS = -shared -W
 LD_FLAGS = -L/usr/local/lib -luuid -lm -lz
 LD_FLAGS_FFMPEG = -lavformat -lavcodec -lavutil
 else
-C_FLAGS = -Wpedantic -Wno-deprecated-declarations
-SO_FLAGS = -dynamiclib -undefined suppress -flat_namespace -L/usr/local/lib -lavformat -lavcodec -lavutil
+# Locate FFmpeg via pkg-config: Homebrew installs into a versioned, prefix-
+# specific path (e.g. /opt/homebrew/Cellar/ffmpeg/<ver>) that varies by machine
+# and changes on every upgrade, so hardcoded -I/-L flags do not work.
+FFMPEG_PKGS := libavformat libavcodec libavutil
+ifneq ($(shell pkg-config --exists $(FFMPEG_PKGS) && echo yes),yes)
+$(error FFmpeg not found via pkg-config; install it (e.g. 'brew install ffmpeg pkg-config') or set PKG_CONFIG_PATH)
+endif
+FFMPEG_CFLAGS := $(shell pkg-config --cflags $(FFMPEG_PKGS))
+C_FLAGS = -Wpedantic -Wno-deprecated-declarations $(FFMPEG_CFLAGS)
+SO_FLAGS = -dynamiclib
 LD_FLAGS = -L/usr/local/lib -lz
-LD_FLAGS_FFMPEG = -lavformat -lavcodec -lavutil
+LD_FLAGS_FFMPEG := $(shell pkg-config --libs $(FFMPEG_PKGS))
 endif
 
 -include ../obj/$(OBJS:.o=.d)
@@ -150,7 +158,7 @@ no_ffmpeg: $(OBJS_WITH_PATH) main.o
 	@exit 1
 
 with_gpac: /usr/local/lib/libgpac.so $(OBJS_WITH_PATH) main.o
-	@echo "\n*** Compiling Caption Inpsector Executible with GPAC. ***"
+	@echo "\n*** Compiling Caption Inspector Executible with GPAC. ***"
 	clang -o ${CI_EXECUTABLE} ../obj/main.o $(OBJS_IN_OBJ_DIR) $(LD_FLAGS) $(LD_FLAGS_FFMPEG) -lgpac
 
 ci_without_ffmpeg: C_FLAGS:=$(C_FLAGS) -DDONT_COMPILE_FFMPEG
@@ -161,7 +169,7 @@ ci_with_gpac: with_gpac
 
 ${CI_SHARED_LIB}: $(OBJS_WITH_PATH)
 	@echo "\n*** Compiling Caption Inspector Dynamic Library to interface with Python. ***"
-	clang $(SO_FLAGS) -o ${CI_SHARED_LIB} $(OBJS_IN_OBJ_DIR)
+	clang $(SO_FLAGS) -o ${CI_SHARED_LIB} $(OBJS_IN_OBJ_DIR) ${LD_FLAGS} ${LD_FLAGS_FFMPEG}
 
 clean:
 	@echo "*** Cleaning Target Files. ***"

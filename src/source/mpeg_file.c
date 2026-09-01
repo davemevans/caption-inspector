@@ -42,6 +42,7 @@
 
 #ifndef DONT_COMPILE_FFMPEG
 static void loggingCallback( void*, int, const char*, va_list );
+static void cleanupFFmpeg( MpegFileCtx* );
 #endif
 
 /*----------------------------------------------------------------------------*/
@@ -71,10 +72,16 @@ boolean MpegFileInitialize( Context* rootCtxPtr, uint8 bailAfterMins ) {
 
     int ret = 0;
     int stream_index = 0;
-    AVCodec *dec = NULL;
+    const AVCodec *dec = NULL;
 
     rootCtxPtr->mpegFileCtxPtr = malloc(sizeof(MpegFileCtx));
     MpegFileCtx* ctxPtr = rootCtxPtr->mpegFileCtxPtr;
+
+    ctxPtr->decoderContext = NULL;
+    ctxPtr->formatContext = NULL;
+    ctxPtr->frame = NULL;
+    ctxPtr->packet = NULL;
+    ctxPtr->draining = FALSE;
 
     ctxPtr->firstPts = 0;
     ctxPtr->ccCountMismatchErrors = 0;
@@ -127,9 +134,6 @@ boolean MpegFileInitialize( Context* rootCtxPtr, uint8 bailAfterMins ) {
     ctxPtr->fileSize = length;
     close(fdesc);
 
-    avcodec_register_all();
-    av_register_all();
-
     switch( GetMinDebugLevel(DBG_FF_MPEG) ) {
         case DEBUG_LEVEL_FATAL:
             av_log_set_level(AV_LOG_FATAL);
@@ -164,6 +168,13 @@ boolean MpegFileInitialize( Context* rootCtxPtr, uint8 bailAfterMins ) {
         return FALSE;
     }
 
+    // filter non-video tracks (we only care for embedded captions)
+    for (int i = 0; i < ctxPtr->formatContext->nb_streams; i++) {
+        if (ctxPtr->formatContext->streams[i]->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
+            ctxPtr->formatContext->streams[i]->discard = AVDISCARD_ALL;
+        }
+    }
+
     ret = avformat_find_stream_info(ctxPtr->formatContext,NULL);
     if( ret < 0 ) {
         av_log(NULL,AV_LOG_ERROR,"could not find any stream\n");
@@ -182,18 +193,36 @@ boolean MpegFileInitialize( Context* rootCtxPtr, uint8 bailAfterMins ) {
     }
 
     stream_index = ret;
-    ctxPtr->decoderContext = ctxPtr->formatContext->streams[stream_index]->codec;
     ctxPtr->streamIndex = stream_index;
-    ret = avcodec_open2(ctxPtr->decoderContext, dec, NULL);
-    if( ret < 0 ) {
-        av_log(NULL,AV_LOG_ERROR,"unable to open codec\n");
+
+    ctxPtr->decoderContext = avcodec_alloc_context3(dec);
+    if( ctxPtr->decoderContext == NULL ) {
+        av_log(NULL,AV_LOG_ERROR,"unable to allocate decoder context\n");
         free(ctxPtr);
         rootCtxPtr->mpegFileCtxPtr = NULL;
         return FALSE;
     }
 
-    //Initialize frame where input frame will be stored
+    ret = avcodec_parameters_to_context(ctxPtr->decoderContext, ctxPtr->formatContext->streams[stream_index]->codecpar);
+    if( ret < 0 ) {
+        av_log(NULL,AV_LOG_ERROR,"unable to copy codec parameters to decoder context\n");
+        avcodec_free_context(&ctxPtr->decoderContext);
+        free(ctxPtr);
+        rootCtxPtr->mpegFileCtxPtr = NULL;
+        return FALSE;
+    }
+
+    ret = avcodec_open2(ctxPtr->decoderContext, dec, NULL);
+    if( ret < 0 ) {
+        av_log(NULL,AV_LOG_ERROR,"unable to open codec\n");
+        avcodec_free_context(&ctxPtr->decoderContext);
+        free(ctxPtr);
+        rootCtxPtr->mpegFileCtxPtr = NULL;
+        return FALSE;
+    }
+
     ctxPtr->frame = av_frame_alloc();
+    ctxPtr->packet = av_packet_alloc();
 
     AVRational retval = av_guess_frame_rate(ctxPtr->formatContext, ctxPtr->formatContext->streams[stream_index], ctxPtr->frame);
     ctxPtr->frameRatePerSecTimesOneHundred = ((retval.num * 100)/retval.den);
@@ -293,45 +322,66 @@ uint8 MpegFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
     }
     
     while( TRUE ) {
-        int retval = 0;
-        int got_frame;
-        AVPacket packet;
         int64 pts = 0;
 
         ctxPtr->len = 0;
-        
-        retval = av_read_frame(ctxPtr->formatContext, &packet);
-        if( retval == AVERROR_EOF ) {
+
+        int retval = avcodec_receive_frame(ctxPtr->decoderContext, ctxPtr->frame);
+
+        if( retval == AVERROR(EAGAIN) ) {
+            // The decoder needs more input before it can produce a frame.
+            retval = av_read_frame(ctxPtr->formatContext, ctxPtr->packet);
+            if( retval == AVERROR_EOF ) {
+                // No more input: send a flush packet so buffered frames drain out.
+                if( ctxPtr->draining == FALSE ) {
+                    avcodec_send_packet(ctxPtr->decoderContext, NULL);
+                    ctxPtr->draining = TRUE;
+                }
+            } else if( retval < 0 ) {
+                av_log(NULL, AV_LOG_ERROR, "not able to read the packet\n");
+                return FALSE;
+            } else {
+                if( ctxPtr->packet->stream_index == ctxPtr->streamIndex ) {
+                    if( ctxPtr->firstPts == 0 ) {
+                        // Rollover of the 33-bit PTS is handled where the
+                        // per-frame delta is computed, below.
+                        ctxPtr->firstPts = ctxPtr->packet->pts;
+                    }
+                    avcodec_send_packet(ctxPtr->decoderContext, ctxPtr->packet);
+                }
+                av_packet_unref(ctxPtr->packet);
+            }
+            continue;
+        } else if( retval == AVERROR_EOF ) {
+            // The decoder is fully drained: we have reached the end of the asset.
             *isDonePtr = TRUE;
             Sinks sinks = ctxPtr->sinks;
+            cleanupFFmpeg(ctxPtr);
             free(ctxPtr);
             rootCtxPtr->mpegFileCtxPtr = NULL;
             return ShutdownSinks(rootCtxPtr, &sinks);
         } else if( retval < 0 ) {
-            av_log(NULL, AV_LOG_ERROR, "not able to read the packet\n");
-            return FALSE;
-        } else if( packet.stream_index != ctxPtr->streamIndex ) {
-            continue;
-        }
-        
-        retval = avcodec_decode_video2( ctxPtr->decoderContext, ctxPtr->frame, &got_frame, &packet );
-        if( ctxPtr->firstPts == 0 ) {
-// TODO - Need to account for rollover
-            ctxPtr->firstPts = packet.pts;
-        }
-
-        if( retval < 0 ) {
             av_log(NULL,AV_LOG_ERROR,"unable to decode packet\n");
             return FALSE;
-        } else if( !got_frame ) {
-            continue;
         }
-        
+
+        // retval == 0: a decoded frame is available in ctxPtr->frame.
         for( int i = 0; i < ctxPtr->frame->nb_side_data; i++ ) {
             if(ctxPtr->frame->side_data[i]->type == AV_FRAME_DATA_A53_CC) {
-                ctxPtr->frame->pts = av_frame_get_best_effort_timestamp(ctxPtr->frame);
+                ctxPtr->frame->pts = ctxPtr->frame->best_effort_timestamp;
 
-                pts = (((ctxPtr->frame->pts - ctxPtr->firstPts) * ctxPtr->formatContext->streams[ctxPtr->streamIndex]->time_base.num)) /
+                // MPEG-TS PTS is a 33-bit value on a 90 kHz clock, so it wraps
+                // every ~26.5 hours. A wrap makes (pts - firstPts) jump hugely
+                // negative; add one wrap period back to keep the timeline
+                // continuous. The half-range threshold ensures we only correct a
+                // real wrap and not the small negative delta that legitimately
+                // occurs from B-frame presentation reordering near the start.
+                int64 ptsDelta = ctxPtr->frame->pts - ctxPtr->firstPts;
+                if( ptsDelta < -(1LL << 32) ) {
+                    ptsDelta += (1LL << 33);
+                }
+
+                pts = ((ptsDelta * ctxPtr->formatContext->streams[ctxPtr->streamIndex]->time_base.num)) /
                        (ctxPtr->formatContext->streams[ctxPtr->streamIndex]->time_base.den / 1000);
 
                 if(ctxPtr->frame->side_data[i]->size > BUFSIZE) {
@@ -351,6 +401,7 @@ uint8 MpegFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
                 LOG(DEBUG_LEVEL_WARN, DBG_MPEG_FILE, "Unable to find Captions after %d mins. Abandoning.", captionTime.minute);
                 *isDonePtr = TRUE;
                 Sinks sinks = ctxPtr->sinks;
+                cleanupFFmpeg(ctxPtr);
                 free(ctxPtr);
                 rootCtxPtr->mpegFileCtxPtr = NULL;
                 return ShutdownSinks(rootCtxPtr, &sinks);
@@ -435,4 +486,20 @@ static void loggingCallback( void* ptr, int level, const char* fmt, va_list vl )
 
     DebugLog( dbgLevel, DBG_FF_MPEG, "FFMPEG", 0, message );
 }  // loggingCallback()
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    cleanupFFmpeg()
+ |
+ | DESCRIPTION:
+ |    Releases the FFmpeg resources owned by the MPEG File Context. Since the
+ |    decoder context is now allocated by us (avcodec_alloc_context3), it must be
+ |    freed explicitly along with the frame, packet, and format context.
+ -------------------------------------------------------------------------------*/
+static void cleanupFFmpeg( MpegFileCtx* ctxPtr ) {
+    if( ctxPtr->packet != NULL ) av_packet_free(&ctxPtr->packet);
+    if( ctxPtr->frame != NULL ) av_frame_free(&ctxPtr->frame);
+    if( ctxPtr->decoderContext != NULL ) avcodec_free_context(&ctxPtr->decoderContext);
+    if( ctxPtr->formatContext != NULL ) avformat_close_input(&ctxPtr->formatContext);
+}  // cleanupFFmpeg()
 #endif
