@@ -147,9 +147,10 @@ uint8 SccEncodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
     
     ASSERT(ctxPtr->sccFrameRate == inBuffer->captionTime.frameRatePerSecTimesOneHundred);
     
-    frame = ((((inBuffer->captionTime.hour - ctxPtr->hourAdjust) * 60 * 60) +
-             (inBuffer->captionTime.minute * 60) + inBuffer->captionTime.second) * inBuffer->captionTime.frameRatePerSecTimesOneHundred) / 100;
-    frame = frame + inBuffer->captionTime.frame;
+    CaptionTime adjustedTime = inBuffer->captionTime;
+    adjustedTime.hour = adjustedTime.hour - ctxPtr->hourAdjust;
+    adjustedTime.dropframe = ctxPtr->sccDropframe;
+    frame = timeCodeToFrame(&adjustedTime);
     
     if( (inBuffer->numElements % 2) != 0 ) {
         LOG(DEBUG_LEVEL_ERROR, DBG_SCC_ENC, "Odd Number of Bytes: %d - %s", inBuffer->numElements, inBuffer->dataPtr);
@@ -260,9 +261,7 @@ boolean SccEncodeShutdown( void* rootCtxPtr ) {
 static Buffer* generateNewCcDataPacket( uint8 firstByte, uint8 secondByte, uint8 ccCount, uint32 frameNum, uint32 frameRate, boolean dropframe ) {
 
     Buffer* outputBuffer = NewBuffer(BUFFER_TYPE_BYTES, (3 * ccCount));
-    frameToTimeCode( frameNum, frameRate, &outputBuffer->captionTime );
-    // frameToTimeCode() does not carry the drop-frame flag, set it explicitly
-    outputBuffer->captionTime.dropframe = dropframe;
+    frameToTimeCode( frameNum, frameRate, dropframe, &outputBuffer->captionTime );
     outputBuffer->numElements = outputBuffer->maxNumElements;
     
     outputBuffer->dataPtr[0] = VALID_CEA608E_LINE21_FIELD_1_CC;

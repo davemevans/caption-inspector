@@ -75,7 +75,7 @@ uint8 numCcConstructsFromFramerate( uint32 );
 uint8 cdpFramerateFromFramerate( uint32 );
 uint16 timeCodeRateToFrameRateTimesOneHundred( uint8, boolean );
 boolean isFramerateValid( uint32 frameRatePerSecTimesOneHundred );
-void frameToTimeCode( uint32, uint32, CaptionTime* );
+void frameToTimeCode( uint32, uint32, boolean, CaptionTime* );
 uint32 timeCodeToFrame( CaptionTime* );
 
 #endif /* cc_utils_h */
