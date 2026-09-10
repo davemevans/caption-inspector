@@ -29,7 +29,7 @@ test results do not depend on a distribution's FFmpeg version.
 
 On macOS, using [Homebrew](https://brew.sh):
 ```
-brew install ffmpeg
+brew install ffmpeg pkgconf
 ```
 
 On Debian or Ubuntu:
