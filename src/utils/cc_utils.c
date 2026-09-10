@@ -34,6 +34,8 @@
 /*--                     Private Member Declarations                        --*/
 /*----------------------------------------------------------------------------*/
 
+static uint32 dropFramesPerMinute( uint32, boolean );
+
 /*----------------------------------------------------------------------------*/
 /*--                       Public Member Functions                          --*/
 /*----------------------------------------------------------------------------*/
@@ -448,24 +450,47 @@ void printCaptionsLine( char* buffer, uint16 size, uint8* dataPtr, uint16 dataLe
  | INPUT PARAMETERS:
  |    frameNum - The frame number index into the asset.
  |    frameRate - (Framerate / Sec) * 100.
+ |    dropframe - Label the frames with SMPTE drop-frame timecode.
  |
  | RETURN VALUES:
  |    captionsTimePtr - The HH:MM:SS:FF representation
  |
  | DESCRIPTION:
  |    This converts from frame number to time code. Additionally, this will save
- |    the frame rate in the same output structure.
+ |    the frame rate and drop-frame flag in the same output structure.
+ |
+ |    Timecode counts frames at the nominal rate (24, 25, 30, 50 or 60), so a
+ |    29.97 asset is labelled 30 frames per timecode second. Drop-frame (29.97 or
+ |    59.94 only) skips frame labels 0-1 (0-3 at 59.94) at the start of every
+ |    minute except each tenth minute, which keeps the labels near wall-clock time.
  -------------------------------------------------------------------------------*/
-void frameToTimeCode( uint32 frameNum, uint32 frameRate, CaptionTime* captionTimePtr ) {
+void frameToTimeCode( uint32 frameNum, uint32 frameRate, boolean dropframe, CaptionTime* captionTimePtr ) {
     ASSERT(captionTimePtr);
-    
-    captionTimePtr->frame = ((frameNum * 100) % frameRate) / 100;
-    uint32 tmpFrameNum = frameNum - captionTimePtr->frame;
-    tmpFrameNum = (tmpFrameNum * 100) / frameRate;
-    captionTimePtr->hour = tmpFrameNum / 3600;
-    captionTimePtr->minute = (tmpFrameNum % 3600) / 60;
-    captionTimePtr->second = tmpFrameNum % 60;
+    ASSERT(frameRate);
+
+    uint32 nominalRate = (frameRate + 50) / 100;
+    uint32 dropFrames = dropFramesPerMinute(frameRate, dropframe);
+
+    if( dropFrames != 0 ) {
+        uint32 framesPerMinute = (nominalRate * 60) - dropFrames;
+        uint32 framesPerTenMinutes = (nominalRate * 600) - (dropFrames * 9);
+        uint32 tenMinuteBlocks = frameNum / framesPerTenMinutes;
+        uint32 framesIntoBlock = frameNum % framesPerTenMinutes;
+        // Add back the labels that were skipped before this frame.
+        frameNum = frameNum + (dropFrames * 9 * tenMinuteBlocks);
+        if( framesIntoBlock > dropFrames ) {
+            frameNum = frameNum + (dropFrames * ((framesIntoBlock - dropFrames) / framesPerMinute));
+        }
+    }
+
+    uint32 totalSeconds = frameNum / nominalRate;
+    captionTimePtr->frame = frameNum % nominalRate;
+    captionTimePtr->hour = totalSeconds / 3600;
+    captionTimePtr->minute = (totalSeconds % 3600) / 60;
+    captionTimePtr->second = totalSeconds % 60;
+    captionTimePtr->millisecond = 0;
     captionTimePtr->frameRatePerSecTimesOneHundred = frameRate;
+    captionTimePtr->dropframe = (dropFrames != 0) ? TRUE : FALSE;
     captionTimePtr->source = CAPTION_TIME_FRAME_NUMBERING;
 }  // frameToTimeCode()
 
@@ -475,26 +500,44 @@ void frameToTimeCode( uint32 frameNum, uint32 frameRate, CaptionTime* captionTim
  |
  | INPUT PARAMETERS:
  |    captionsTimePtr - The HH:MM:SS:FF representation, including Framerate
+ |                      and the drop-frame flag.
  |
  | RETURN VALUES:
  |    frameNum - The frame number index into the asset.
  |
  | DESCRIPTION:
- |    This converts from frame number to time code. Additionally, this will save
- |    the frame rate in the same output structure.
+ |    This converts from time code to frame number, the inverse of
+ |    frameToTimeCode().
  -------------------------------------------------------------------------------*/
 uint32 timeCodeToFrame( CaptionTime* captionTimePtr ) {
     ASSERT(captionTimePtr);
     ASSERT(captionTimePtr->frameRatePerSecTimesOneHundred);
-    
-    uint32 frame = (((captionTimePtr->hour * 60 * 60) +
-                     (captionTimePtr->minute * 60) + captionTimePtr->second) *
-                    captionTimePtr->frameRatePerSecTimesOneHundred) / 100;
-    frame = frame + captionTimePtr->frame;
-    return frame;
-}
+
+    uint32 nominalRate = (captionTimePtr->frameRatePerSecTimesOneHundred + 50) / 100;
+    uint32 dropFrames = dropFramesPerMinute(captionTimePtr->frameRatePerSecTimesOneHundred, captionTimePtr->dropframe);
+    uint32 totalMinutes = (captionTimePtr->hour * 60) + captionTimePtr->minute;
+
+    uint32 frame = (((totalMinutes * 60) + captionTimePtr->second) * nominalRate) + captionTimePtr->frame;
+    return frame - (dropFrames * (totalMinutes - (totalMinutes / 10)));
+}  // timeCodeToFrame()
 
 /*----------------------------------------------------------------------------*/
 /*--                       Private Member Functions                         --*/
 /*----------------------------------------------------------------------------*/
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    dropFramesPerMinute()
+ |
+ | DESCRIPTION:
+ |    The number of frame labels drop-frame timecode skips each minute: 2 at
+ |    29.97, 4 at 59.94, and none for non-drop-frame or any other rate.
+ -------------------------------------------------------------------------------*/
+static uint32 dropFramesPerMinute( uint32 frameRate, boolean dropframe ) {
+    uint32 nominalRate = (frameRate + 50) / 100;
+    if( (dropframe == TRUE) && ((nominalRate * 100) != frameRate) && ((nominalRate == 30) || (nominalRate == 60)) ) {
+        return nominalRate / 15;
+    }
+    return 0;
+}  // dropFramesPerMinute()
 
