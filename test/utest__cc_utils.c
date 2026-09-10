@@ -330,6 +330,56 @@ void utest__timeCodeToFrame( TEST_SUITE_RECEIVED_ARGUMENTS ) {
 
 }  // utest__timeCodeToFrame()
 
+/*------------------------------------------------------------------------------
+ | FUNCTION UNDER TEST: frameToTimeCode() / timeCodeToFrame()
+ |
+ | TEST CASES:
+ |    1) frameToTimeCode() and timeCodeToFrame() are exact inverses for every
+ |       frame number across a range of frame rates. A single-value master
+ |       comparison cannot catch a systematic conversion error (the master would
+ |       carry the same error); this invariant can, and specifically guards the
+ |       drop-frame rounding bug where the two disagreed for fractional rates.
+ |    2) The exact 29.97 drop-frame frames that exposed that bug.
+ -------------------------------------------------------------------------------*/
+void utest__timeCodeRoundTrip( TEST_SUITE_RECEIVED_ARGUMENTS ) {
+    TEST_INITIALIZE
+    CaptionTime captionTime;
+
+    // The fractional rates (2997, 5994, 2398) are the ones the historic
+    // modulo-based frame extraction rounded inconsistently; the integer rates
+    // confirm the fix leaves them untouched.
+    TEST_START("Test Case: frameToTimeCode()/timeCodeToFrame() are exact inverses across rates.");
+    uint32 rates[] = { 2400, 2500, 2997, 3000, 5994, 2398 };
+    boolean invertsCleanly = TRUE;
+    for( int rateIdx = 0; (rateIdx < 6) && (invertsCleanly == TRUE); rateIdx++ ) {
+        for( uint32 frameNum = 0; frameNum <= 200000; frameNum++ ) {
+            frameToTimeCode( frameNum, rates[rateIdx], &captionTime );
+            if( timeCodeToFrame( &captionTime ) != frameNum ) {
+                invertsCleanly = FALSE;
+                break;
+            }
+        }
+    }
+    ASSERT_EQ(TRUE, invertsCleanly);
+    TEST_END
+
+    // Regression: before the fix, frame 741 rendered as 00:00:24;21 (should be
+    // ;22) and frame 5604 as an invalid 00:03:06;30 (should be 00:03:07;00).
+    TEST_START("Test Case: frameToTimeCode() renders 29.97 drop-frame boundaries correctly.");
+    frameToTimeCode( 741, 2997, &captionTime );
+    ASSERT_EQ(0, captionTime.hour);
+    ASSERT_EQ(0, captionTime.minute);
+    ASSERT_EQ(24, captionTime.second);
+    ASSERT_EQ(22, captionTime.frame);
+    frameToTimeCode( 5604, 2997, &captionTime );
+    ASSERT_EQ(0, captionTime.hour);
+    ASSERT_EQ(3, captionTime.minute);
+    ASSERT_EQ(7, captionTime.second);
+    ASSERT_EQ(0, captionTime.frame);
+    TEST_END
+
+}  // utest__timeCodeRoundTrip()
+
 /*----------------------------------------------------------------------------*/
 /*--                             Test Suite                                 --*/
 /*----------------------------------------------------------------------------*/
@@ -378,6 +428,10 @@ int main( int argc, char* argv[] ) {
 
     TEST_SUITE_START("Test Suite: cc_utils.c -- timeCodeToFrame()");
     utest__timeCodeToFrame( &tmpNumSuccessfulTests, &tmpNumFailedTests );
+    TEST_SUITE_END
+
+    TEST_SUITE_START("Test Suite: cc_utils.c -- timeCode round trip");
+    utest__timeCodeRoundTrip( &tmpNumSuccessfulTests, &tmpNumFailedTests );
     TEST_SUITE_END
 
     SHUTDOWN_TEST_FRAMEWORK

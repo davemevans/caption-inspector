@@ -459,12 +459,23 @@ void printCaptionsLine( char* buffer, uint16 size, uint8* dataPtr, uint16 dataLe
 void frameToTimeCode( uint32 frameNum, uint32 frameRate, CaptionTime* captionTimePtr ) {
     ASSERT(captionTimePtr);
     
-    captionTimePtr->frame = ((frameNum * 100) % frameRate) / 100;
-    uint32 tmpFrameNum = frameNum - captionTimePtr->frame;
-    tmpFrameNum = (tmpFrameNum * 100) / frameRate;
-    captionTimePtr->hour = tmpFrameNum / 3600;
-    captionTimePtr->minute = (tmpFrameNum % 3600) / 60;
-    captionTimePtr->second = tmpFrameNum % 60;
+    // Recover the total seconds exactly as timeCodeToFrame() lays them down
+    // (frameNum = (totalSeconds * frameRate) / 100 + frame), so this is its inverse.
+    // The previous modulo-based frame extraction rounded the second boundary
+    // inconsistently for fractional rates (e.g. 29.97), shifting drop-frame
+    // timecodes by a frame.
+    uint32 totalSeconds = (frameNum * 100) / frameRate;
+    // Integer rounding of the division can leave totalSeconds one short at a second
+    // boundary (which would otherwise render as an invalid frame 30); advance while
+    // the next second genuinely begins at or before this frame.
+    while( (((totalSeconds + 1) * frameRate) / 100) <= frameNum ) {
+        totalSeconds++;
+    }
+    uint32 secondBaseFrame = (totalSeconds * frameRate) / 100;
+    captionTimePtr->frame = frameNum - secondBaseFrame;
+    captionTimePtr->hour = totalSeconds / 3600;
+    captionTimePtr->minute = (totalSeconds % 3600) / 60;
+    captionTimePtr->second = totalSeconds % 60;
     captionTimePtr->frameRatePerSecTimesOneHundred = frameRate;
     captionTimePtr->source = CAPTION_TIME_FRAME_NUMBERING;
 }  // frameToTimeCode()
