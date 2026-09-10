@@ -30,6 +30,7 @@ To install FFMPEG Version 4.0.2, follow the below list (for Mac), using the Dock
 ```
 brew install nasm
 brew install yasm
+brew install pkgconf
 curl -s http://ffmpeg.org/releases/ffmpeg-4.0.2.tar.gz | tar zxvf - -C . 
 cd ffmpeg-4.0.2/
 ./configure  --enable-version3 --enable-hardcoded-tables --enable-shared --enable-static --enable-small --enable-libass --enable-postproc --enable-avresample --enable-libfreetype --disable-lzma --enable-opencl --enable-pthreads
