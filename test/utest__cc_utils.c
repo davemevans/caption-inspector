@@ -297,7 +297,7 @@ void utest__frameToTimeCode( TEST_SUITE_RECEIVED_ARGUMENTS ) {
     CaptionTime captionTime;
 
     TEST_START("Test Case: frameToTimeCode() - Valid Frame and Framerate.");
-    frameToTimeCode( 455280, 2400, &captionTime );
+    frameToTimeCode( 455280, 2400, FALSE, &captionTime );
     ASSERT_EQ(5, captionTime.hour);
     ASSERT_EQ(16, captionTime.minute);
     ASSERT_EQ(10, captionTime.second);
@@ -324,11 +324,107 @@ void utest__timeCodeToFrame( TEST_SUITE_RECEIVED_ARGUMENTS ) {
     captionTime.second = 10;
     captionTime.frame = 0;
     captionTime.frameRatePerSecTimesOneHundred = 2400;
+    captionTime.dropframe = FALSE;
     retval = timeCodeToFrame( &captionTime );
     ASSERT_EQ(455280, retval);
     TEST_END
 
 }  // utest__timeCodeToFrame()
+
+/*------------------------------------------------------------------------------
+ | FUNCTION UNDER TEST: frameToTimeCode() / timeCodeToFrame()
+ |
+ | TEST CASES:
+ |    1) frameToTimeCode() and timeCodeToFrame() are exact inverses for every
+ |       frame number across a range of frame rates, drop-frame and not. A
+ |       single-value master comparison cannot catch a systematic conversion
+ |       error (the master would carry the same error); this invariant can.
+ |    2) Drop-frame never produces a skipped label (frames 0-1 at 29.97, 0-3 at
+ |       59.94, in the first second of a minute that is not a tenth minute).
+ |    3) SMPTE drop-frame labels at the 29.97 minute boundaries.
+ |    4) SMPTE drop-frame labels at 59.94, and an hour of frames is 01:00:00;00.
+ |    5) Non-drop-frame counts at the nominal rate, also for 23.976 and 29.97.
+ -------------------------------------------------------------------------------*/
+static boolean isTimeCode( CaptionTime* captionTimePtr, uint8 hour, uint8 minute, uint8 second, uint8 frame ) {
+    return (captionTimePtr->hour == hour) && (captionTimePtr->minute == minute) &&
+           (captionTimePtr->second == second) && (captionTimePtr->frame == frame);
+}
+
+void utest__timeCodeRoundTrip( TEST_SUITE_RECEIVED_ARGUMENTS ) {
+    TEST_INITIALIZE
+    CaptionTime captionTime;
+
+    TEST_START("Test Case: frameToTimeCode()/timeCodeToFrame() are exact inverses across rates.");
+    uint32 rates[] = { 2400, 2500, 2997, 3000, 5994, 2397, 2997, 5994 };
+    boolean dropframes[] = { FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE };
+    boolean invertsCleanly = TRUE;
+    for( int rateIdx = 0; (rateIdx < 8) && (invertsCleanly == TRUE); rateIdx++ ) {
+        for( uint32 frameNum = 0; frameNum <= 250000; frameNum++ ) {
+            frameToTimeCode( frameNum, rates[rateIdx], dropframes[rateIdx], &captionTime );
+            if( timeCodeToFrame( &captionTime ) != frameNum ) {
+                invertsCleanly = FALSE;
+                break;
+            }
+        }
+    }
+    ASSERT_EQ(TRUE, invertsCleanly);
+    TEST_END
+
+    TEST_START("Test Case: frameToTimeCode() never produces a skipped drop-frame label.");
+    boolean labelsValid = TRUE;
+    for( uint32 frameNum = 0; frameNum <= 250000; frameNum++ ) {
+        frameToTimeCode( frameNum, 2997, TRUE, &captionTime );
+        if( (captionTime.second == 0) && ((captionTime.minute % 10) != 0) && (captionTime.frame < 2) ) labelsValid = FALSE;
+        frameToTimeCode( frameNum, 5994, TRUE, &captionTime );
+        if( (captionTime.second == 0) && ((captionTime.minute % 10) != 0) && (captionTime.frame < 4) ) labelsValid = FALSE;
+    }
+    ASSERT_EQ(TRUE, labelsValid);
+    TEST_END
+
+    TEST_START("Test Case: frameToTimeCode() renders 29.97 drop-frame boundaries correctly.");
+    frameToTimeCode( 29, 2997, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 0, 0, 29 ));
+    ASSERT_EQ(TRUE, captionTime.dropframe);
+    frameToTimeCode( 30, 2997, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 0, 1, 0 ));
+    frameToTimeCode( 741, 2997, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 0, 24, 21 ));
+    frameToTimeCode( 1799, 2997, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 0, 59, 29 ));
+    frameToTimeCode( 1800, 2997, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 1, 0, 2 ));
+    frameToTimeCode( 5604, 2997, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 3, 7, 0 ));
+    frameToTimeCode( 17981, 2997, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 9, 59, 29 ));
+    frameToTimeCode( 17982, 2997, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 10, 0, 0 ));
+    frameToTimeCode( 107892, 2997, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 1, 0, 0, 0 ));
+    TEST_END
+
+    TEST_START("Test Case: frameToTimeCode() renders 59.94 drop-frame boundaries correctly.");
+    frameToTimeCode( 3599, 5994, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 0, 59, 59 ));
+    frameToTimeCode( 3600, 5994, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 1, 0, 4 ));
+    frameToTimeCode( 215784, 5994, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 1, 0, 0, 0 ));
+    TEST_END
+
+    TEST_START("Test Case: frameToTimeCode() counts non-drop-frame at the nominal rate.");
+    frameToTimeCode( 86400, 2397, FALSE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 1, 0, 0, 0 ));
+    frameToTimeCode( 1800, 2997, FALSE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 1, 0, 0 ));
+    ASSERT_EQ(FALSE, captionTime.dropframe);
+    // Drop-frame only exists at 29.97 and 59.94.
+    frameToTimeCode( 1800, 3000, TRUE, &captionTime );
+    ASSERT_EQ(TRUE, isTimeCode( &captionTime, 0, 1, 0, 0 ));
+    ASSERT_EQ(FALSE, captionTime.dropframe);
+    TEST_END
+
+}  // utest__timeCodeRoundTrip()
 
 /*----------------------------------------------------------------------------*/
 /*--                             Test Suite                                 --*/
@@ -378,6 +474,10 @@ int main( int argc, char* argv[] ) {
 
     TEST_SUITE_START("Test Suite: cc_utils.c -- timeCodeToFrame()");
     utest__timeCodeToFrame( &tmpNumSuccessfulTests, &tmpNumFailedTests );
+    TEST_SUITE_END
+
+    TEST_SUITE_START("Test Suite: cc_utils.c -- timeCode round trip");
+    utest__timeCodeRoundTrip( &tmpNumSuccessfulTests, &tmpNumFailedTests );
     TEST_SUITE_END
 
     SHUTDOWN_TEST_FRAMEWORK
