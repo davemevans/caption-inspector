@@ -91,6 +91,27 @@ char* ExtrnlAdptrGetVersion( void ) {
 
 /*------------------------------------------------------------------------------
  | NAME:
+ |    ExtrnlAdptrIsMovSupported()
+ |
+ | RETURN VALUES:
+ |    boolean - TRUE if this build can process MOV/MP4 files, FALSE otherwise.
+ |
+ | DESCRIPTION:
+ |    MOV/MP4 handling depends on the GPAC library, which is an optional compile
+ |    time dependency (COMPILE_GPAC). This lets a caller - notably the test suite -
+ |    tell whether MOV support is present so it can skip MOV-specific behavior on a
+ |    build without GPAC rather than treating its absence as a failure.
+ -------------------------------------------------------------------------------*/
+boolean ExtrnlAdptrIsMovSupported( void ) {
+#ifdef COMPILE_GPAC
+    return TRUE;
+#else
+    return FALSE;
+#endif
+}  // ExtrnlAdptrIsMovSupported()
+
+/*------------------------------------------------------------------------------
+ | NAME:
  |    ExtrnlAdptrInitialize()
  |
  | INPUT PARAMETERS:
