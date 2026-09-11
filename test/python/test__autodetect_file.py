@@ -13,6 +13,11 @@ MCC_CAPTIONS_FILE = 2
 MPEG_BINARY_FILE = 3
 MOV_BINARY_FILE = 4
 
+# MOV/MP4 file-type detection is only compiled in when the library is built with
+# GPAC. Probe the library so the MOV test skips cleanly on a build without it
+# rather than failing (a .mov is reported as an MPEG file when GPAC is absent).
+MOV_SUPPORTED = ctypes.CDLL(CAPTION_INSPECTOR_LIBRARY).ExtrnlAdptrIsMovSupported() != 0
+
 
 class TestClass(object):
     def test__Determine_SCC_File(self):
@@ -35,6 +40,7 @@ class TestClass(object):
         file_type = clib.DetermineFileType("../media/BigBuckBunny_256x144-24fps.ts".encode('utf-8'))
         assert file_type is MPEG_BINARY_FILE
 
+    @pytest.mark.skipif(not MOV_SUPPORTED, reason="MOV support requires GPAC (COMPILE_GPAC); library built without it")
     def test__Determine_MOV_File(self):
         clib = ctypes.CDLL(CAPTION_INSPECTOR_LIBRARY)
         file_type = clib.DetermineFileType("../media/BigBuckBunny_160x90-24fps.mov".encode('utf-8'))
