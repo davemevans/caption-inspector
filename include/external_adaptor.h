@@ -61,5 +61,6 @@ boolean ExtrnlAdptrPlumbMccPipeline(char*, char*);
 boolean ExtrnlAdptrPlumbMpegPipeline(char*, char*, boolean);
 boolean ExtrnlAdptrPlumbMovPipeline(char*, char*, boolean);
 void ExtrnlAdptrDriveDecodePipeline( void );
+boolean ExtrnlAdptrIsMovSupported( void );
 
 #endif /* external_adaptor_h */
