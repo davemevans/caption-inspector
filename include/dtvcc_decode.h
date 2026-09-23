@@ -466,6 +466,15 @@
 #define DTVCC_G3_CC_ICON                                  0xA0
 #define DTVCC_UNKNOWN_G3_CHAR                             0x52
 
+//---------------------------------------------------------------------------------------
+//                                 DTVCC C3 Code Set
+//---------------------------------------------------------------------------------------
+
+// EXT1 0x90-0x9F are variable-length commands. The byte after the command is a header:
+// Type (b7-b6), a zero bit (b5), and the number of data bytes that follow it (b4-b0).
+
+#define DTVCC_C3_VARIABLE_LENGTH_MASK                     0x1F
+
 /*----------------------------------------------------------------------------*/
 /*--                              Structures                                --*/
 /*----------------------------------------------------------------------------*/
