@@ -612,23 +612,23 @@ static void processServiceBlock( DtvccDecodeCtx* ctxPtr, uint8* dataPtr, uint8 b
                 /* This section is for future codes. While by definition we can't do any work on them, we must advance */
                 /* however many bytes would be consumed if these codes were supported, as defined in the specs.        */
                 // WARN: This code is completely untested due to lack of samples. Just following specs!
-                if( dataPtr[index+2] < 0x07 ) { // 00-07 : Single-byte control bytes (0 additional bytes)
+                if( dataPtr[index+1] <= 0x07 ) { // 00-07 : Single-byte control bytes (0 additional bytes)
                     used = 2;
-                } else if( dataPtr[index+2] <0x0F ) { // 08-0F : Two-byte control codes (1 additional byte)
+                } else if( dataPtr[index+1] <= 0x0F ) { // 08-0F : Two-byte control codes (1 additional byte)
                     used = 3;
-                } else if( dataPtr[index+2] <0x0F ) { // 10-17 : Three-byte control codes (2 additional bytes)
+                } else if( dataPtr[index+1] <= 0x17 ) { // 10-17 : Three-byte control codes (2 additional bytes)
                     used = 4;
                 } else {  // 18-1F : Four-byte control codes (3 additional bytes)
                     used = 5;
                 }
-                LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping C2 Code: 0x%02X", dataPtr[1] );
+                LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping C2 Code: 0x%02X", dataPtr[index+1] );
             } else if( (dataPtr[index+1] >= DTVCC_MIN_G0_CODE) && (dataPtr[index+1] <= DTVCC_MAX_G0_CODE) ) {  // G2: Extended Misc. Characters
                 dtvccDataPtr->dtvccType = DTVCC_G2_CHAR;
-                if( (dataPtr[index+2] == 0x20) || (dataPtr[index+2] == 0x21) || (dataPtr[index+2] == 0x25) || (dataPtr[index+2] == 0x2A) ||
-                    (dataPtr[index+2] == 0x2C) || ((dataPtr[index+2] >= 0x30) && (dataPtr[index+2] <= 0x35)) || (dataPtr[index+2] == 0x39) ||
-                    (dataPtr[index+2] == 0x3A) || (dataPtr[index+2] == 0x3C) || (dataPtr[index+2] == 0x3D) || (dataPtr[index+2] == 0x3F) ||
-                    ((dataPtr[index+2] >= 0x76) && (dataPtr[index+2] <= 0x7F)) ) {
-                    dtvccDataPtr->data.g2char = dataPtr[index+2];
+                if( (dataPtr[index+1] == 0x20) || (dataPtr[index+1] == 0x21) || (dataPtr[index+1] == 0x25) || (dataPtr[index+1] == 0x2A) ||
+                    (dataPtr[index+1] == 0x2C) || ((dataPtr[index+1] >= 0x30) && (dataPtr[index+1] <= 0x35)) || (dataPtr[index+1] == 0x39) ||
+                    (dataPtr[index+1] == 0x3A) || (dataPtr[index+1] == 0x3C) || (dataPtr[index+1] == 0x3D) || (dataPtr[index+1] == 0x3F) ||
+                    ((dataPtr[index+1] >= 0x76) && (dataPtr[index+1] <= 0x7F)) ) {
+                    dtvccDataPtr->data.g2char = dataPtr[index+1];
                     LOG( DEBUG_LEVEL_VERBOSE, DBG_708_DEC, "G2: '%s'", DtvccDecodeG2CharSet(dtvccDataPtr->data.g2char) );
                     if( ctxPtr->foundText == NO_TEXT_FOUND ) {
                         ctxPtr->foundText = TEXT_FOUND;
@@ -637,28 +637,28 @@ static void processServiceBlock( DtvccDecodeCtx* ctxPtr, uint8* dataPtr, uint8 b
                         LOG(DEBUG_LEVEL_INFO, DBG_708_DEC, "DTVCC First Character of text found on Service %d at %s", srvcNum, captionTimeStr);
                     }
                 } else {
-                    LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping Unknown G2 Char: 0x%02X", dataPtr[index+2] );
+                    LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping Unknown G2 Char: 0x%02X", dataPtr[index+1] );
                     dtvccDataPtr->data.g2char = DTVCC_UNKNOWN_G2_CHAR;
                 }
                 used = 2;
             } else if( (dataPtr[index+1] >= DTVCC_MIN_C1_CODE) && (dataPtr[index+1] <= DTVCC_MAX_C1_CODE) ) {
                 dtvccDataPtr->dtvccType = DTVCC_C3_CMD;
-                if( (dataPtr[index+2] < 0x80) || (dataPtr[index+2] > 0x9F) ) {
-                    LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "Skipping Invalid C3 Cmd: 0x%02X", dataPtr[index+2] );
-                } else if( dataPtr[index+2] <= 0x87 ) { // 80-87 : Five-byte control bytes (4 additional bytes)
+                if( dataPtr[index+1] <= 0x87 ) { // 80-87 : Five-byte control bytes (4 additional bytes)
                     used = 6;
-                } else if( dataPtr[index+2] <= 0x8F ) { // 88-8F : Six-byte control codes (5 additional byte)
+                } else if( dataPtr[index+1] <= 0x8F ) { // 88-8F : Six-byte control codes (5 additional byte)
                     used = 7;
                 } else {
                     // 90-9F : These are variable length commands, that can even span several segments.
                     // They were envisioned for things like downloading fonts and graphics.
-                    // We are not supporting this set of data.
-                    LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "Likely Data Corruption. Unsupported C3 Data Range: 0x%02X", dataPtr[index+2] );
+                    // We are not supporting this set of data. Skip just EXT1 + the command byte and
+                    // resume; without a length we cannot reliably consume the payload.
+                    LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "Likely Data Corruption. Unsupported C3 Data Range: 0x%02X", dataPtr[index+1] );
+                    used = 2;
                 }
             } else {  // G3 Character Set (Basically just the [CC] Symbol).
                 dtvccDataPtr->dtvccType = DTVCC_G3_CHAR;
-                if( dataPtr[index+2] != DTVCC_G3_CC_ICON ) {
-                    dtvccDataPtr->data.g3char = dataPtr[index+2];
+                if( dataPtr[index+1] == DTVCC_G3_CC_ICON ) {
+                    dtvccDataPtr->data.g3char = dataPtr[index+1];
                     LOG( DEBUG_LEVEL_VERBOSE, DBG_708_DEC, "G3: '%s'", DtvccDecodeG2CharSet(dtvccDataPtr->data.g3char) );
                     if( ctxPtr->foundText == NO_TEXT_FOUND ) {
                         ctxPtr->foundText = TEXT_FOUND;
@@ -667,7 +667,7 @@ static void processServiceBlock( DtvccDecodeCtx* ctxPtr, uint8* dataPtr, uint8 b
                         LOG(DEBUG_LEVEL_INFO, DBG_708_DEC, "DTVCC First Character of text found on Service %d at %s", srvcNum, captionTimeStr);
                     }
                 } else {
-                    LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping Unknown G3 Char: 0x%02X", dataPtr[index+2] );
+                    LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping Unknown G3 Char: 0x%02X", dataPtr[index+1] );
                     dtvccDataPtr->data.g3char = DTVCC_UNKNOWN_G3_CHAR;
                 }
                 used = 2;

@@ -1015,7 +1015,7 @@ static void decodePacketData( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagSt
                         len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G0Svc:%02d", ctxPtr->currentService);
                         ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
                     } else {
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G%s", DtvccDecodeG0CharSet(ccData));
+                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G%3s", DtvccDecodeG0CharSet(ccData));
                         ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
                         len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "S:%02d %s", ctxPtr->currentService, DtvccDecodeG0CharSet(ccData));
                         ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
@@ -1024,18 +1024,20 @@ static void decodePacketData( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagSt
                 } else if ((ccData >= DTVCC_MIN_C1_CODE) && (ccData <= DTVCC_MAX_C1_CODE)) {
                     decodeC1CmdCode(ctxPtr, ccData, tagStr, decStr, errStr);
                 } else {
-                    if( strlen(DtvccDecodeG1CharSet(ccData)) == 1 ) {
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G1:%s", DtvccDecodeG1CharSet(ccData));
+                    const char* g1 = DtvccDecodeG1CharSet(ccData);
+                    char quoted[CC_DATA_ELEMENT_HALF_DEC_STR_SIZE];
+                    snprintf(quoted, sizeof(quoted), "\"%s\"", g1);
+                    if( strlen(g1) == 1 ) {
+                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G1:%s", g1);
                         ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G1 - \"%s\"", DtvccDecodeG1CharSet(ccData));
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
                     } else {
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G:%s", DtvccDecodeG1CharSet(ccData));
+                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G%3s", g1);
                         ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G1 -\"%s\"", DtvccDecodeG1CharSet(ccData));
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
                     }
-                    appendText(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG1CharSet(ccData));
+                    // Right-justify the quoted glyph so any pad sits between the ':' and the '"'.
+                    len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G1:%5s", quoted);
+                    ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+                    appendText(txtStr->txtStr708[ctxPtr->currentService-1], g1);
                 }
             } else {  // Use Extended Set
                 ctxPtr->cea708State = CEA708_STATE_EXTENDED_CODE;
@@ -1599,209 +1601,128 @@ static void decodeExtCmdCode( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagSt
     int len;
 
     if( ctxPtr->cea708Code == CEA708_CODE_EXTENDED_CODE_UNKNOWN ) {
+        // This is the single byte that follows EXT1. Per CEA-708-D it both selects the
+        // extended table and, for G2/G3, *is* the character - there is no further byte.
+        // For C2/C3 this byte fixes how many payload bytes follow, which we then skip.
         if( (ccData >= DTVCC_MIN_C0_CODE) && (ccData <= DTVCC_MAX_C0_CODE) ) { // C2: Extended Misc. Control Codes
-            ctxPtr->cea708Code = CEA708_CODE_C2;
-            ctxPtr->cea708BytesRemaining = 4;
+            if( ccData <= 0x07 ) {         // 00-07 : no additional bytes
+                ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
+                ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
+                ctxPtr->cea708BytesRemaining = 0;
+            } else if( ccData <= 0x0F ) {  // 08-0F : 1 additional byte
+                ctxPtr->cea708Code = CEA708_CODE_C2;
+                ctxPtr->cea708BytesRemaining = 1;
+            } else if( ccData <= 0x17 ) {  // 10-17 : 2 additional bytes
+                ctxPtr->cea708Code = CEA708_CODE_C2;
+                ctxPtr->cea708BytesRemaining = 2;
+            } else {                       // 18-1F : 3 additional bytes
+                ctxPtr->cea708Code = CEA708_CODE_C2;
+                ctxPtr->cea708BytesRemaining = 3;
+            }
             len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C2:1");
             ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
             len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C2:1-%02X?", ccData);
             ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
             LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "{%X} - Skipping C2 Code: 0x%02X Srvc: %d", add708Error(ctxPtr, errStr), ccData, ctxPtr->currentService);
-        } else if( (ccData >= DTVCC_MIN_G0_CODE) && (ccData <= DTVCC_MAX_G0_CODE)) {  // G2: Extended Misc. Characters
-            ctxPtr->cea708Code = CEA708_CODE_G2;
-            ctxPtr->cea708BytesRemaining = 1;
-            len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G2:1");
-            ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-            len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G2:1-%02X ", ccData);
-            ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-        } else if( (ccData >= DTVCC_MIN_C1_CODE) && (ccData <= DTVCC_MAX_C1_CODE) ) {
-            ctxPtr->cea708Code = CEA708_CODE_C3;
-            ctxPtr->cea708BytesRemaining = 6;
+        } else if( (ccData >= DTVCC_MIN_G0_CODE) && (ccData <= DTVCC_MAX_G0_CODE)) {  // G2: this byte IS the character
+            ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
+            ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
+            ctxPtr->cea708BytesRemaining = 0;
+            if( (ccData == 0x20) || (ccData == 0x21) || (ccData == 0x25) || (ccData == 0x2A) ||
+                (ccData == 0x2C) || ((ccData >= 0x30) && (ccData <= 0x35)) || (ccData == 0x39) ||
+                (ccData == 0x3A) || (ccData == 0x3C) || (ccData == 0x3D) || (ccData == 0x3F) ||
+                ((ccData >= 0x76) && (ccData <= 0x7F)) ) {
+                const char* g2 = DtvccDecodeG2CharSet(ccData);
+                char quoted[CC_DATA_ELEMENT_HALF_DEC_STR_SIZE];
+                snprintf(quoted, sizeof(quoted), "'%s'", g2);
+                len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G%3s", g2);
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                // Right-justify the quoted glyph so any pad sits between the ':' and the '\''.
+                len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G2:%5s", quoted);
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+                appendText(txtStr->txtStr708[ctxPtr->currentService-1], g2);
+            } else {
+                len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G2:?");
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G2:?-%02X?", ccData);
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+                LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "{%X} - Skipping Unknown G2 Char: 0x%02X Srvc: %d", add708Error(ctxPtr, errStr), ccData, ctxPtr->currentService);
+            }
+        } else if( (ccData >= DTVCC_MIN_C1_CODE) && (ccData <= DTVCC_MAX_C1_CODE) ) {  // C3: Extended Control Codes
+            if( ccData <= 0x87 ) {         // 80-87 : 4 additional bytes
+                ctxPtr->cea708Code = CEA708_CODE_C3;
+                ctxPtr->cea708BytesRemaining = 4;
+            } else if( ccData <= 0x8F ) {  // 88-8F : 5 additional bytes
+                ctxPtr->cea708Code = CEA708_CODE_C3;
+                ctxPtr->cea708BytesRemaining = 5;
+            } else {                       // 90-9F : variable length, unsupported - skip just this byte
+                ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
+                ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
+                ctxPtr->cea708BytesRemaining = 0;
+            }
             len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C3:1");
             ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
             len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C3:1-%02X?", ccData);
             ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
             LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "{%X} - Skipping C3 Code: 0x%02X Srvc: %d", add708Error(ctxPtr, errStr), ccData, ctxPtr->currentService);
-        } else {  // G3 Character Set (Basically just the [CC] Symbol).
-            ctxPtr->cea708Code = CEA708_CODE_G3;
-            ctxPtr->cea708BytesRemaining = 1;
-            len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G3:1");
+        } else if( (ccData >= DTVCC_MIN_G1_CODE) && (ccData <= DTVCC_MAX_G1_CODE) )  {  // G3: this byte IS the character
+            ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
+            ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
+            ctxPtr->cea708BytesRemaining = 0;
+            if( ccData == DTVCC_G3_CC_ICON ) {
+                const char* g3 = DtvccDecodeG3CharSet(ccData);
+                char quoted[CC_DATA_ELEMENT_HALF_DEC_STR_SIZE];
+                snprintf(quoted, sizeof(quoted), "'%s'", g3);
+                len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G%3s", g3);
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                // Right-justify the quoted glyph so any pad sits between the ':' and the '\''.
+                len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G3:%5s", quoted);
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+                appendText(txtStr->txtStr708[ctxPtr->currentService-1], g3);
+            } else {
+                len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G3:?");
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G3:?-%02X?", ccData);
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+                LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "{%X} - Skipping Unknown G3 Char: 0x%02X Srvc: %d", add708Error(ctxPtr, errStr), ccData, ctxPtr->currentService);
+            }
+        } else {
+            // Unreachable: the four ranges above tile 0x00-0xFF. Kept defensive.
+            ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
+            ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
+            ctxPtr->cea708BytesRemaining = 0;
+            len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "??:1");
             ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-            len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G3:1-%02X ", ccData);
+            len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "??:?-%02X ", ccData);
             ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
+            LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "{%X} - Skipping Unknown extension Code: 0x%02X Srvc: %d", add708Error(ctxPtr, errStr), ccData, ctxPtr->currentService);
         }
     } else {
+        // Skipping the trailing payload byte(s) of an unsupported C2/C3 command. How many
+        // bytes follow was already fixed by the command byte that followed EXT1, so here we
+        // simply consume them and return to DATA_WAIT once the count is exhausted.
+        ASSERT(ctxPtr->cea708BytesRemaining > 0);
         switch (ctxPtr->cea708Code) {
             case CEA708_CODE_C2:
-                switch (ctxPtr->cea708BytesRemaining) {
-                    case 4:
-                        /* This section is for future codes. While by definition we can't do any work on them, we must advance */
-                        /* however many bytes would be consumed if these codes were supported, as defined in the specs.        */
-                        // WARN: This code is completely untested due to lack of samples. Just following specs!
-                        if (ccData < 0x07) { // 00-07 : Single-byte control bytes (0 additional bytes)
-                            ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
-                            ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
-                            ctxPtr->cea708BytesRemaining = 0;
-                        } else if (ccData < 0x0F) { // 08-0F : Two-byte control codes (1 additional byte)
-                            ctxPtr->cea708BytesRemaining = 1;
-                        } else if (ccData < 0x0F) { // 10-17 : Three-byte control codes (2 additional bytes)
-                            ctxPtr->cea708BytesRemaining = 2;
-                        } else {  // 18-1F : Four-byte control codes (3 additional bytes)
-                            ctxPtr->cea708BytesRemaining = 3;
-                        }
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C2:2");
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C2:2-%02X?", ccData);
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                        break;
-                    case 3:
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C2:3");
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C2:3-%02X?", ccData);
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                        ctxPtr->cea708BytesRemaining = 2;
-                        break;
-                    case 2:
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C2:4");
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C2:4-%02X?", ccData);
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                        ctxPtr->cea708BytesRemaining = 1;
-                        break;
-                    case 1:
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C2:5");
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C2:5-%02X?", ccData);
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                        ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
-                        ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
-                        ctxPtr->cea708BytesRemaining = 0;
-                        break;
-                    default:
-                        ASSERT(0);
-                        break;
-                }
-                break;
-            case CEA708_CODE_G2:
-                ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
-                ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
-                ctxPtr->cea708BytesRemaining = 0;
-                if ((ccData == 0x20) || (ccData == 0x21) || (ccData == 0x25) || (ccData == 0x2A) ||
-                    (ccData == 0x2C) || ((ccData >= 0x30) && (ccData <= 0x35)) || (ccData == 0x39) ||
-                    (ccData == 0x3A) || (ccData == 0x3C) || (ccData == 0x3D) || (ccData == 0x3F) ||
-                    ((ccData >= 0x76) && (ccData <= 0x7F))) {
-                    if( strlen(DtvccDecodeG2CharSet(ccData)) == 2 ) {
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G2%s", DtvccDecodeG2CharSet(ccData));
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G2-'%s' ", DtvccDecodeG2CharSet(ccData));
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                    } else {
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G2:%s", DtvccDecodeG2CharSet(ccData));
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G2 - '%s'", DtvccDecodeG2CharSet(ccData));
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                    }
-                    appendText(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG2CharSet(ccData));
-                } else {
-                    len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G2:2");
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                    len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G2:2-%02X?", ccData);
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                    LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "{%X} - Skipping Unknown G2 Char: 0x%02X Srvc: %d",
-                        add708Error(ctxPtr, errStr), ccData, ctxPtr->currentService);
-                }
+                len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C2:+");
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C2:+-%02X?", ccData);
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
                 break;
             case CEA708_CODE_C3:
-                switch (ctxPtr->cea708BytesRemaining) {
-                    case 6:
-                        if ((ccData < 0x80) || (ccData > 0x9F)) {
-                            ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
-                            ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
-                            ctxPtr->cea708BytesRemaining = 0;
-                        } else if (ccData <= 0x87) { // 80-87 : Five-byte control bytes (4 additional bytes)
-                            ctxPtr->cea708BytesRemaining = 4;
-                        } else if (ccData <= 0x8F) { // 88-8F : Six-byte control codes (5 additional byte)
-                            ctxPtr->cea708BytesRemaining = 5;
-                        } else {
-                            // 90-9F : These are variable length commands, that can even span several segments.
-                            // They were envisioned for things like downloading fonts and graphics.
-                            // We are not supporting this set of data.
-                            ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
-                            ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
-                            ctxPtr->cea708BytesRemaining = 0;
-                            LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT,
-                                "{%X} - SLikely Data Corruption. Unsupported C3 Data Range: 0x%02X %d",
-                                add708Error(ctxPtr, errStr), ccData, ctxPtr->currentService);
-                        }
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C3:2");
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C3:2-%02X?", ccData);
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                        break;
-                    case 5:
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C3:3");
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C3:3-%02X?", ccData);
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                        ctxPtr->cea708BytesRemaining = 4;
-                        break;
-                    case 4:
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C3:4");
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C3:4-%02X?", ccData);
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                        ctxPtr->cea708BytesRemaining = 3;
-                        break;
-                    case 3:
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C3:5");
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C3:5-%02X?", ccData);
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                        ctxPtr->cea708BytesRemaining = 2;
-                        break;
-                    case 2:
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C3:6");
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C3:6-%02X?", ccData);
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                        ctxPtr->cea708BytesRemaining = 1;
-                        break;
-                    case 1:
-                        len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C3:7");
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                        len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C3:7-%02X?", ccData);
-                        ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                        ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
-                        ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
-                        ctxPtr->cea708BytesRemaining = 0;
-                        break;
-                    default:
-                        ASSERT(0);
-                        break;
-                }
-                break;
-            case CEA708_CODE_G3:
-                ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
-                ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
-                ctxPtr->cea708BytesRemaining = 0;
-                if( ccData != DTVCC_G3_CC_ICON ) {
-                    len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G3%s", DtvccDecodeG3CharSet(ccData));
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                    len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G3: '%s'", DtvccDecodeG3CharSet(ccData));
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                    appendText(txtStr->txtStr708[ctxPtr->currentService-1], DtvccDecodeG3CharSet(ccData));
-                } else {
-                    len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "G3:2");
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                    len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "G3:2-%02X?", ccData);
-                    ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-                    LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "{%X} - Skipping Unknown G3 Char: 0x%02X Srvc: %d",
-                        add708Error(ctxPtr, errStr), ccData, ctxPtr->currentService);
-                }
+                len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "C3:+");
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
+                len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "C3:+-%02X?", ccData);
+                ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
                 break;
             default:
                 ASSERT(0);
                 break;
+        }
+        ctxPtr->cea708BytesRemaining = ctxPtr->cea708BytesRemaining - 1;
+        if( ctxPtr->cea708BytesRemaining == 0 ) {
+            ctxPtr->cea708State = CEA708_STATE_DATA_WAIT;
+            ctxPtr->cea708Code = CEA708_CODE_UNKNOWN;
         }
     }
 }  // decodeExtCmdCode()

@@ -277,7 +277,7 @@ uint8 DtvccOutShutdown( void* rootCtxPtr ) {
  |    This method decodes G0 Chars into UTF-8.
  -------------------------------------------------------------------------------*/
 const char* DtvccDecodeG0CharSet(uint8 c) {
-  if ((c>0x1F) && (c<0x80)) {
+  if ((c>=0x20) && (c<=0x7F)) {
     return normalizedG0CharSet[(c - 0x20)];
   } else {
     return BARF;
@@ -298,7 +298,7 @@ const char* DtvccDecodeG0CharSet(uint8 c) {
  |    This method decodes G1 Chars into UTF-8.
  -------------------------------------------------------------------------------*/
 const char* DtvccDecodeG1CharSet(uint8 c) {
-  if ((c>0x9F) && (c<0xFF)) {
+  if ((c>=0xA0) && (c<=0xFF)) {
     return normalizedG1CharSet[(c - 0xA0)];
   } else {
     return BARF;

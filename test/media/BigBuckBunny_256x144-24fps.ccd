@@ -32,8 +32,8 @@ File Format=Comcast CC Data File
  |                tables can be used to understand the decoding.
  |
  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-Creation Date=Thursday, August 13, 2026
-Creation Time=12:33:11
+Creation Date=Wednesday, September 23, 2026
+Creation Time=14:28:57
 Frame Rate=23.97
 Drop Frame=True
 
@@ -108,7 +108,7 @@ TEXT: Svc3 - "-C'EST UN"
 00:00:00,417  F1:94D6  F2:9452  F1:8080  PS:CA90  PD:2D44    Ch1 - PAC  Ch3 - PAC  F1 - NULL  <--3|B:16  G0:-|G0:D    Row:14  Column:12  Row:14  Column:04  608: Field 1 NULL  <--3P020|B:16,S04  G0Svc:04|G0Svc:04  
               PD:4153  PD:2049  PD:5354  PD:2045  PD:494E    G0:A|G0:S  G0: |G0:I  G0:S|G0:T  G0: |G0:E  G0:I|G0:N    G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  
               PD:4592  PD:0200  PD:0000  PS:0BB3  PD:2D49    G0:E|SPL   SPL1|SPL2  B:00|B:00  <--0|B:19  G0:-|G0:I    G0Svc:04|C1:{SPL}   Row-02 | Col-00   B:NULL  |B:NULL    <--0P022|B:19,S05  G0Svc:05|G0Svc:05  
-              PD:5353  PD:4F20  PD:C920  PD:554D  PD:2045    G0:S|G0:S  G0:O|G0:   G:É|G0:   G0:U|G0:M  G0: |G0:E    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G1 -"É"|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
+              PD:5353  PD:4F20  PD:C920  PD:554D  PD:2045    G0:S|G0:S  G0:O|G0:   G É|G0:   G0:U|G0:M  G0: |G0:E    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G1: "É"|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
               PD:5841  PD:4745  PD:524F  PD:2E00  XD:0000    G0:X|G0:A  G0:G|G0:E  G0:R|G0:O  G0:.|B:00  _________    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|B:NULL    _________________  
 TEXT: Svc4 - "-DAS IST EINE" Svc5 - "-ISSO É UM EXAGERO." 
 
@@ -126,7 +126,7 @@ TEXT: Ch1 - "- " Svc6 - "-  "
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Ch1 - "20" Ch3 - "-E" Svc2 - "ESTIRAMIENTO." 
 
-00:00:00,542  F1:AE80  F2:D34F  PS:C76A  PD:C954  PD:4952    Ch1 - "."  Ch3: "SO"  <--3|B:10  G:É|G0:T  G0:I|G0:R    Channel - 1:  "."  Chan-3:  "S"  "O"  <--3P014|B:10,S03  G1 -"É"|G0Svc:03  G0Svc:03|G0Svc:03  
+00:00:00,542  F1:AE80  F2:D34F  PS:C76A  PD:C954  PD:4952    Ch1 - "."  Ch3: "SO"  <--3|B:10  G É|G0:T  G0:I|G0:R    Channel - 1:  "."  Chan-3:  "S"  "O"  <--3P014|B:10,S03  G1: "É"|G0Svc:03  G0Svc:03|G0Svc:03  
               PD:454D  PD:454E  PD:542E  PD:0000  XD:0000    G0:E|G0:M  G0:E|G0:N  G0:T|G0:.  B:00|B:00  _________    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  B:NULL  |B:NULL    _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
@@ -333,7 +333,7 @@ TEXT: Svc1 - "- FINE."
 TEXT: Svc2 - "-Bien.2024." 
 
 00:00:01,835  F2:8080  F1:8080  F2:8080  PS:8A71  PD:912A    F2 - NULL  F1 - NULL  F2 - NULL  <--2|B:17  SPC |SPC1    608: Field 2 NULL  608: Field 1 NULL  608: Field 2 NULL  <--2P020|B:17,S03  C1:{SPC}|0  2:2:2  
-              PD:0015  PD:2D54  PD:72E8  PD:7392  PD:0100    SPC2|SPC3  G0:-|G0:T  G0:r|G:è  G0:s|SPL   SPL1|SPL2    0  0:0:0|RGB1:1:1  G0Svc:03|G0Svc:03  G0Svc:03|G1 -"è"  G0Svc:03|C1:{SPL}   Row-01 | Col-00   
+              PD:0015  PD:2D54  PD:72E8  PD:7392  PD:0100    SPC2|SPC3  G0:-|G0:T  G0:r|G è  G0:s|SPL   SPL1|SPL2    0  0:0:0|RGB1:1:1  G0Svc:03|G0Svc:03  G0Svc:03|G1: "è"  G0Svc:03|C1:{SPL}   Row-01 | Col-00   
               PD:6269  PD:656E  PD:2E00  XD:0000  XD:0000    G0:b|G0:i  G0:e|G0:n  G0:.|B:00  _________  _________    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|B:NULL    _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
@@ -720,19 +720,19 @@ TEXT: Ch1 - "." Ch3 - "MO" Svc1 - "WE MOVE IN THERE."
 
 00:00:04,379  F1:8080  F2:D320  PS:CA51  PD:4E4F  PD:5320    F1 - NULL  Ch3: "S "  <--3|B:17  G0:N|G0:O  G0:S|G0:     608: Field 1 NULL  Chan-3:  "S"  " "  <--3P020|B:17,S02  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  
               PD:4D55  PD:4441  PD:4D4F  PD:5320  PD:414C    G0:M|G0:U  G0:D|G0:A  G0:M|G0:O  G0:S|G0:   G0:A|G0:L    G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  
-              PD:4CCD  PD:2E00  XD:0000  XD:0000  XD:0000    G0:L|G:Í  G0:.|B:00  _________  _________  _________    G0Svc:02|G1 -"Í"  G0Svc:02|B:NULL    _________________  _________________  _________________  
+              PD:4CCD  PD:2E00  XD:0000  XD:0000  XD:0000    G0:L|G Í  G0:.|B:00  _________  _________  _________    G0Svc:02|G1: "Í"  G0Svc:02|B:NULL    _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Ch3 - "S " Svc2 - "NOS MUDAMOS ALLÍ." 
 
 00:00:04,421  F1:8080  F2:C14C  F1:8080  PS:0B72  PD:4E4F    F1 - NULL  Ch3: "AL"  F1 - NULL  <--0|B:18  G0:N|G0:O    608: Field 1 NULL  Chan-3:  "A"  "L"  608: Field 1 NULL  <--0P022|B:18,S03  G0Svc:03|G0Svc:03  
               PD:5553  PD:2045  PD:4E54  PD:524F  PD:4E53    G0:U|G0:S  G0: |G0:E  G0:N|G0:T  G0:R|G0:O  G0:N|G0:S    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  
-              PD:204C  PD:C092  PD:0300  PD:0000  PS:498F    G0: |G0:L  G:À|SPL   SPL1|SPL2  B:00|B:00  <--1|B:15    G0Svc:03|G0Svc:03  G1 -"À"|C1:{SPL}   Row-03 | Col-00   B:NULL  |B:NULL    <--1P018|B:15,S04  
+              PD:204C  PD:C092  PD:0300  PD:0000  PS:498F    G0: |G0:L  G À|SPL   SPL1|SPL2  B:00|B:00  <--1|B:15    G0Svc:03|G0Svc:03  G1: "À"|C1:{SPL}   Row-03 | Col-00   B:NULL  |B:NULL    <--1P018|B:15,S04  
               PD:4745  PD:5749  PD:4E4E  PD:452C  PD:2057    G0:G|G0:E  G0:W|G0:I  G0:N|G0:N  G0:E|G0:,  G0: |G0:W    G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  
               PD:4952  PD:9202  PD:0000  XD:0000  XD:0000    G0:I|G0:R  SPL |SPL1  SPL2|B:00  _________  _________    G0Svc:04|G0Svc:04  C1:{SPL}| Row-02    Col-00 |B:NULL    _________________  _________________  
 TEXT: Ch3 - "AL" Svc3 - "NOUS ENTRONS LÀ" Svc4 - "GEWINNE, WIR" 
 
-00:00:04,462  F2:13A2  F1:8080  PS:8BB2  PD:4ED3  PD:5320    Ch3 - PAC  F1 - NULL  <--2|B:18  G0:N|G:Ó  G0:S|G0:     _Row:13 -  Green_  608: Field 1 NULL  <--2P022|B:18,S05  G0Svc:05|G1 -"Ó"  G0Svc:05|G0Svc:05  
+00:00:04,462  F2:13A2  F1:8080  PS:8BB2  PD:4ED3  PD:5320    Ch3 - PAC  F1 - NULL  <--2|B:18  G0:N|G Ó  G0:S|G0:     _Row:13 -  Green_  608: Field 1 NULL  <--2P022|B:18,S05  G0Svc:05|G1: "Ó"  G0Svc:05|G0Svc:05  
               PD:4E4F  PD:5320  PD:4D4F  PD:5645  PD:4D4F    G0:N|G0:O  G0:S|G0:   G0:M|G0:O  G0:V|G0:E  G0:M|G0:O    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
               PD:5392  PD:0300  PD:0000  XD:0000  XD:0000    G0:S|SPL   SPL1|SPL2  B:00|B:00  _________  _________    G0Svc:05|C1:{SPL}   Row-03 | Col-00   B:NULL  |B:NULL    _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
@@ -755,7 +755,7 @@ TEXT: Svc3 - "DEDANS."
 
 00:00:04,587  F1:8080  F2:8080  F1:8080  PS:4688  PD:4245    F1 - NULL  F2 - NULL  F1 - NULL  <--1|B:08  G0:B|G0:E    608: Field 1 NULL  608: Field 2 NULL  608: Field 1 NULL  <--1P012|B:08,S04  G0Svc:04|G0Svc:04  
               PD:5745  PD:4745  PD:4E2E  PD:0000  PS:86A8    G0:W|G0:E  G0:G|G0:E  G0:N|G0:.  B:00|B:00  <--2|B:08    G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  B:NULL  |B:NULL    <--2P012|B:08,S05  
-              PD:5041  PD:5241  PD:204C  PD:C12E  PD:0000    G0:P|G0:A  G0:R|G0:A  G0: |G0:L  G:Á|G0:.  B:00|B:00    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G1 -"Á"|G0Svc:05  B:NULL  |B:NULL    
+              PD:5041  PD:5241  PD:204C  PD:C12E  PD:0000    G0:P|G0:A  G0:R|G0:A  G0: |G0:L  G Á|G0:.  B:00|B:00    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G1: "Á"|G0Svc:05  B:NULL  |B:NULL    
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Svc4 - "BEWEGEN." Svc5 - "PARA LÁ." 
@@ -1111,7 +1111,7 @@ TEXT: Ch1 - " T" Ch3 - "OM" Svc2 - "ME QUEDO CON EL ALA"
 TEXT: Ch1 - " E" Ch3 - "A " Svc3 - "JE VAIS PRENDRE L'A" 
 
 00:00:06,923  F1:C1D3  F2:454C  F1:8080  PS:8A91  PD:9201    Ch1: "AS"  Ch3: "EL"  F1 - NULL  <--2|B:17  SPL |SPL1    Chan-1:  "A"  "S"  Chan-3:  "E"  "L"  608: Field 1 NULL  <--2P020|B:17,S04  C1:{SPL}| Row-01   
-              PD:0057  PD:4553  PD:5446  PD:4CDC  PD:4745    SPL2|G0:W  G0:E|G0:S  G0:T|G0:F  G0:L|G:Ü  G0:G|G0:E     Col-00 |G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G1 -"Ü"  G0Svc:04|G0Svc:04  
+              PD:0057  PD:4553  PD:5446  PD:4CDC  PD:4745    SPL2|G0:W  G0:E|G0:S  G0:T|G0:F  G0:L|G Ü  G0:G|G0:E     Col-00 |G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G1: "Ü"  G0Svc:04|G0Svc:04  
               PD:4C2E  PD:9202  PD:0000  PS:CBB2  PD:4555    G0:L|G0:.  SPL |SPL1  SPL2|B:00  <--3|B:18  G0:E|G0:U    G0Svc:04|G0Svc:04  C1:{SPL}| Row-02    Col-00 |B:NULL    <--3P022|B:18,S05  G0Svc:05|G0Svc:05  
               PD:2056  PD:4F55  PD:204C  PD:4556  PD:4152    G0: |G0:V  G0:O|G0:U  G0: |G0:L  G0:E|G0:V  G0:A|G0:R    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
               PD:2041  PD:2041  PD:4C41  PD:0000  XD:0000    G0: |G0:A  G0: |G0:A  G0:L|G0:A  B:00|B:00  _________    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  B:NULL  |B:NULL    _________________  
@@ -1173,14 +1173,14 @@ TEXT: Svc6 - " ."
 TEXT: Svc2 - "SE TOMA EL ALA ESTE" Svc3 - "OUEST." 
 
 00:00:07,298  F2:8080  F1:8080  PS:878A  PD:4F53  PD:5446    F2 - NULL  F1 - NULL  <--2|B:10  G0:O|G0:S  G0:T|G0:F    608: Field 2 NULL  608: Field 1 NULL  <--2P014|B:10,S04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  
-              PD:4CDC  PD:4745  PD:4C2E  PD:0000  XD:0000    G0:L|G:Ü  G0:G|G0:E  G0:L|G0:.  B:00|B:00  _________    G0Svc:04|G1 -"Ü"  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  B:NULL  |B:NULL    _________________  
+              PD:4CDC  PD:4745  PD:4C2E  PD:0000  XD:0000    G0:L|G Ü  G0:G|G0:E  G0:L|G0:.  B:00|B:00  _________    G0Svc:04|G1: "Ü"  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  B:NULL  |B:NULL    _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Svc4 - "OSTFLÜGEL." 
 
 00:00:07,340  F2:8080  F1:8080  F2:8080  PS:CCB5  PD:564F    F2 - NULL  F1 - NULL  F2 - NULL  <--3|B:21  G0:V|G0:O    608: Field 2 NULL  608: Field 1 NULL  608: Field 2 NULL  <--3P024|B:21,S05  G0Svc:05|G0Svc:05  
-              PD:43CA  PD:2050  PD:4547  PD:4120  PD:4120    G0:C|G:Ê  G0: |G0:P  G0:E|G0:G  G0:A|G0:   G0:A|G0:     G0Svc:05|G1 -"Ê"  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
+              PD:43CA  PD:2050  PD:4547  PD:4120  PD:4120    G0:C|G Ê  G0: |G0:P  G0:E|G0:G  G0:A|G0:   G0:A|G0:     G0Svc:05|G1: "Ê"  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
               PD:414C  PD:4120  PD:4C45  PD:5300  PD:0300    G0:A|G0:L  G0:A|G0:   G0:L|G0:E  G0:S|?00?  ETX |B:00    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|???-0x00  C0: ETX |B:NULL    
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
@@ -1516,20 +1516,20 @@ TEXT: Svc2 - "PUEDE SER EL PRIMER"
 
 00:00:09,509  F2:8080  F1:8080  F2:8080  PS:0C75  PD:564F    F2 - NULL  F1 - NULL  F2 - NULL  <--0|B:21  G0:V|G0:O    608: Field 2 NULL  608: Field 1 NULL  608: Field 2 NULL  <--0P024|B:21,S03  G0Svc:03|G0Svc:03  
               PD:5553  PD:2050  PD:4F55  PD:5645  PD:5A20    G0:U|G0:S  G0: |G0:P  G0:O|G0:U  G0:V|G0:E  G0:Z|G0:     G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  
-              PD:CA54  PD:5245  PD:204C  PD:4500  PD:0300    G:Ê|G0:T  G0:R|G0:E  G0: |G0:L  G0:E|?00?  ETX |B:00    G1 -"Ê"|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|???-0x00  C0: ETX |B:NULL    
+              PD:CA54  PD:5245  PD:204C  PD:4500  PD:0300    G Ê|G0:T  G0:R|G0:E  G0: |G0:L  G0:E|?00?  ETX |B:00    G1: "Ê"|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|???-0x00  C0: ETX |B:NULL    
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Svc3 - "VOUS POUVEZ ÊTRE LE" 
 
 00:00:09,551  F1:8080  F2:8080  PS:4C95  PD:5349  PD:4520    F1 - NULL  F2 - NULL  <--1|B:21  G0:S|G0:I  G0:E|G0:     608: Field 1 NULL  608: Field 2 NULL  <--1P024|B:21,S04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  
-              PD:4BD6  PD:4E4E  PD:454E  PD:2044  PD:4552    G0:K|G:Ö  G0:N|G0:N  G0:E|G0:N  G0: |G0:D  G0:E|G0:R    G0Svc:04|G1 -"Ö"  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  
+              PD:4BD6  PD:4E4E  PD:454E  PD:2044  PD:4552    G0:K|G Ö  G0:N|G0:N  G0:E|G0:N  G0: |G0:D  G0:E|G0:R    G0Svc:04|G1: "Ö"  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  
               PD:2045  PD:5253  PD:5400  PD:0300  XD:0000    G0: |G0:E  G0:R|G0:S  G0:T|?00?  ETX |B:00  _________    G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|???-0x00  C0: ETX |B:NULL    _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Svc4 - "SIE KÖNNEN DER ERST" 
 
 00:00:09,592  F1:8080  F2:8080  F1:8080  PS:8CB5  PD:564F    F1 - NULL  F2 - NULL  F1 - NULL  <--2|B:21  G0:V|G0:O    608: Field 1 NULL  608: Field 2 NULL  608: Field 1 NULL  <--2P024|B:21,S05  G0Svc:05|G0Svc:05  
-              PD:43CA  PD:2050  PD:4F44  PD:4520  PD:5345    G0:C|G:Ê  G0: |G0:P  G0:O|G0:D  G0:E|G0:   G0:S|G0:E    G0Svc:05|G1 -"Ê"  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
+              PD:43CA  PD:2050  PD:4F44  PD:4520  PD:5345    G0:C|G Ê  G0: |G0:P  G0:O|G0:D  G0:E|G0:   G0:S|G0:E    G0Svc:05|G1: "Ê"  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
               PD:5220  PD:4F20  PD:5052  PD:4900  PD:0300    G0:R|G0:   G0:O|G0:   G0:P|G0:R  G0:I|?00?  ETX |B:00    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|???-0x00  C0: ETX |B:NULL    
               PS:CAD1  PD:1806  PD:2218  PD:0642  PD:1806    <--3|B:17  P16?|P16?  P16?|P16?  P16?|P16?  P16?|P16?    <--3P020|B:17,S06  P16:UNH?|P16:06:1  P16:22:2|P16:UNH?  P16:06:1|P16:42:2  P16:UNH?|P16:06:1  
               PD:2720  PD:1806  PD:2718  PD:0648  PD:0300    P16?|G0:   P16?|P16?  P16?|P16?  P16?|P16?  ETX |B:00    P16:27:2|G0Svc:06  P16:UNH?|P16:06:1  P16:27:2|P16:UNH?  P16:06:1|P16:48:2  C0: ETX |B:NULL    
@@ -1867,7 +1867,7 @@ TEXT: Ch1 - "S"
 
 00:00:11,803  F2:45CE  F1:94F4  PS:8B73  PD:912A  PD:0015    Ch3: "EN"  Ch1 - PAC  <--2|B:19  SPC |SPC1  SPC2|SPC3    Chan-3:  "E"  "N"  Row:15  Column:08  <--2P022|B:19,S03  C1:{SPC}|0  2:2:2  0  0:0:0|RGB1:1:1  
               PD:2D45  PD:4E20  PD:4641  PD:4954  PD:2C20    G0:-|G0:E  G0:N|G0:   G0:F|G0:A  G0:I|G0:T  G0:,|G0:     G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  
-              PD:C741  PD:9201  PD:0500  XD:0000  XD:0000    G:Ç|G0:A  SPL |SPL1  SPL2|B:00  _________  _________    G1 -"Ç"|G0Svc:03  C1:{SPL}| Row-01    Col-05 |B:NULL    _________________  _________________  
+              PD:C741  PD:9201  PD:0500  XD:0000  XD:0000    G Ç|G0:A  SPL |SPL1  SPL2|B:00  _________  _________    G1: "Ç"|G0Svc:03  C1:{SPL}| Row-01    Col-05 |B:NULL    _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Ch3 - "EN" Svc3 - "-EN FAIT, ÇA" 
@@ -1901,14 +1901,14 @@ TEXT: Ch1 - "ND" Ch3 - "NI" Svc1 - "- ACTUALLY, THAT SO"
 TEXT: Ch1 - " O" Ch3 - "." Svc2 - "-EN REALIDAD, ESO" 
 
 00:00:12,012  F2:8080  F1:4620  F2:8080  PS:0A71  PD:4120    F2 - NULL  Ch1: "F "  F2 - NULL  <--0|B:17  G0:A|G0:     608: Field 2 NULL  Chan-1:  "F"  " "  608: Field 2 NULL  <--0P020|B:17,S03  G0Svc:03|G0Svc:03  
-              PD:4C27  PD:4149  PD:5292  PD:0205  PD:47C9    G0:L|G0:'  G0:A|G0:I  G0:R|SPL   SPL1|SPL2  G0:G|G:É    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|C1:{SPL}   Row-02 | Col-05   G0Svc:03|G1 -"É"  
+              PD:4C27  PD:4149  PD:5292  PD:0205  PD:47C9    G0:L|G0:'  G0:A|G0:I  G0:R|SPL   SPL1|SPL2  G0:G|G É    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|C1:{SPL}   Row-02 | Col-05   G0Svc:03|G1: "É"  
               PD:4E49  PD:414C  PD:2E00  XD:0000  XD:0000    G0:N|G0:I  G0:A|G0:L  G0:.|B:00  _________  _________    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|B:NULL    _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Ch1 - "F " Svc3 - "A L'AIRGÉNIAL." 
 
 00:00:12,053  F1:45C1  F2:8080  PS:4A91  PD:2D54  PD:4154    Ch1: "EA"  F2 - NULL  <--1|B:17  G0:-|G0:T  G0:A|G0:T    Chan-1:  "E"  "A"  608: Field 2 NULL  <--1P020|B:17,S04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  
-              PD:53C4  PD:4348  PD:4C49  PD:4348  PD:2C20    G0:S|G:Ä  G0:C|G0:H  G0:L|G0:I  G0:C|G0:H  G0:,|G0:     G0Svc:04|G1 -"Ä"  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  
+              PD:53C4  PD:4348  PD:4C49  PD:4348  PD:2C20    G0:S|G Ä  G0:C|G0:H  G0:L|G0:I  G0:C|G0:H  G0:,|G0:     G0Svc:04|G1: "Ä"  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  
               PD:4441  PD:5300  XD:0000  XD:0000  XD:0000    G0:D|G0:A  G0:S|B:00  _________  _________  _________    G0Svc:04|G0Svc:04  G0Svc:04|B:NULL    _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
@@ -1943,7 +1943,7 @@ TEXT: Svc2 - "SUENA GENIAL."
 TEXT: Svc4 - "KLINGT" 
 
 00:00:12,262  F1:8080  F2:8080  F1:8080  PS:CAB0  PD:9201    F1 - NULL  F2 - NULL  F1 - NULL  <--3|B:16  SPL |SPL1    608: Field 1 NULL  608: Field 2 NULL  608: Field 1 NULL  <--3P020|B:16,S05  C1:{SPL}| Row-01   
-              PD:0550  PD:4152  PD:4543  PD:4520  PD:D354    SPL2|G0:P  G0:A|G0:R  G0:E|G0:C  G0:E|G0:   G:Ó|G0:T     Col-05 |G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G1 -"Ó"|G0Svc:05  
+              PD:0550  PD:4152  PD:4543  PD:4520  PD:D354    SPL2|G0:P  G0:A|G0:R  G0:E|G0:C  G0:E|G0:   G Ó|G0:T     Col-05 |G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G1: "Ó"|G0Svc:05  
               PD:494D  PD:4F2E  PD:0000  PS:0BD3  PD:1806    G0:I|G0:M  G0:O|G0:.  B:00|B:00  <--0|B:19  P16?|P16?    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  B:NULL  |B:NULL    <--0P022|B:19,S06  P16:UNH?|P16:06:1  
               PD:3918  PD:060C  PD:2018  PD:06A9  PD:1806    P16?|P16?  P16?|P16?  G0: |P16?  P16?|P16?  P16?|P16?    P16:39:2|P16:UNH?  P16:06:1|P16:0C:2  G0Svc:06|P16:UNH?  P16:06:1|P16:A9:2  P16:UNH?|P16:06:1  
               PD:4720  PD:1806  PD:4600  PD:0300  XD:0000    P16?|G0:   P16?|P16?  P16?|?00?  ETX |B:00  _________    P16:47:2|G0Svc:06  P16:UNH?|P16:06:1  P16:46:2|???-0x00  C0: ETX |B:NULL    _________________  
@@ -2233,7 +2233,7 @@ TEXT: Ch1 - "TO" Ch3 - "A "
 TEXT: Ch1 - " G" Ch3 - "BU" Svc1 - "THANKS FOR COMING W" Svc2 - "GRACIAS POR VENIR " 
 
 00:00:14,139  F2:C152  F1:4554  PD:0300  PS:CC75  PD:4D45    Ch3: "AR"  Ch1: "ET"  ETX |?00?  <--3|B:21  G0:M|G0:E    Chan-3:  "A"  "R"  Chan-1:  "E"  "T"  C0: ETX |???-0x00  <--3P024|B:21,S03  G0Svc:03|G0Svc:03  
-              PD:5243  PD:4920  PD:4427  PD:CA54  PD:5245    G0:R|G0:C  G0:I|G0:   G0:D|G0:'  G:Ê|G0:T  G0:R|G0:E    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G1 -"Ê"|G0Svc:03  G0Svc:03|G0Svc:03  
+              PD:5243  PD:4920  PD:4427  PD:CA54  PD:5245    G0:R|G0:C  G0:I|G0:   G0:D|G0:'  G Ê|G0:T  G0:R|G0:E    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G1: "Ê"|G0Svc:03  G0Svc:03|G0Svc:03  
               PD:2056  PD:454E  PD:5520  PD:4100  PD:0300    G0: |G0:V  G0:E|G0:N  G0:U|G0:   G0:A|?00?  ETX |B:00    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|???-0x00  C0: ETX |B:NULL    
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
@@ -2241,7 +2241,7 @@ TEXT: Ch1 - "ET" Ch3 - "AR" Svc3 - "MERCI D'ÊTRE VENU A"
 
 00:00:14,180  F2:20CD  F1:20CD  F2:8080  PS:0B93  PD:5649    Ch3: " M"  Ch1: " M"  F2 - NULL  <--0|B:19  G0:V|G0:I    Chan-3:  " "  "M"  Chan-1:  " "  "M"  608: Field 2 NULL  <--0P022|B:19,S04  G0Svc:04|G0Svc:04  
               PD:454C  PD:454E  PD:2044  PD:414E  PD:4B20    G0:E|G0:L  G0:E|G0:N  G0: |G0:D  G0:A|G0:N  G0:K|G0:     G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  
-              PD:46DC  PD:5220  PD:4948  PD:5200  XD:0000    G0:F|G:Ü  G0:R|G0:   G0:I|G0:H  G0:R|B:00  _________    G0Svc:04|G1 -"Ü"  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|B:NULL    _________________  
+              PD:46DC  PD:5220  PD:4948  PD:5200  XD:0000    G0:F|G Ü  G0:R|G0:   G0:I|G0:H  G0:R|B:00  _________    G0Svc:04|G1: "Ü"  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|B:NULL    _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Ch1 - " M" Ch3 - " M" Svc4 - "VIELEN DANK FÜR IHR" 
@@ -2350,8 +2350,8 @@ TEXT: Svc4 - "SACHEN ZU" Svc5 - "PARA PEGAR"
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 
 00:00:14,848  F2:8080  F1:8080  F2:8080  PS:0B72  PD:912A    F2 - NULL  F1 - NULL  F2 - NULL  <--0|B:18  SPC |SPC1    608: Field 2 NULL  608: Field 1 NULL  608: Field 2 NULL  <--0P022|B:18,S03  C1:{SPC}|0  2:2:2  
-              PD:0015  PD:504F  PD:5552  PD:2052  PD:C943    SPC2|SPC3  G0:P|G0:O  G0:U|G0:R  G0: |G0:R  G:É|G0:C    0  0:0:0|RGB1:1:1  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G1 -"É"|G0Svc:03  
-              PD:5550  PD:C952  PD:4552  PD:0000  XD:0000    G0:U|G0:P  G:É|G0:R  G0:E|G0:R  B:00|B:00  _________    G0Svc:03|G0Svc:03  G1 -"É"|G0Svc:03  G0Svc:03|G0Svc:03  B:NULL  |B:NULL    _________________  
+              PD:0015  PD:504F  PD:5552  PD:2052  PD:C943    SPC2|SPC3  G0:P|G0:O  G0:U|G0:R  G0: |G0:R  G É|G0:C    0  0:0:0|RGB1:1:1  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G1: "É"|G0Svc:03  
+              PD:5550  PD:C952  PD:4552  PD:0000  XD:0000    G0:U|G0:P  G É|G0:R  G0:E|G0:R  B:00|B:00  _________    G0Svc:03|G0Svc:03  G1: "É"|G0Svc:03  G0Svc:03|G0Svc:03  B:NULL  |B:NULL    _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Svc3 - "POUR RÉCUPÉRER" 
@@ -2525,8 +2525,8 @@ TEXT: Ch1 - "SS" Ch3 - "RI"
 TEXT: Ch1 - " U" 
 
 00:00:15,974  F2:9452  F1:D080  PS:4A51  PD:912A  PD:0015    Ch3 - PAC  Ch1 - "P"  <--1|B:17  SPC |SPC1  SPC2|SPC3    Row:14  Column:04  Channel - 1:  "P"  <--1P020|B:17,S02  C1:{SPC}|0  2:2:2  0  0:0:0|RGB1:1:1  
-              PD:2DBF  PD:43D3  PD:4D4F  PD:2050  PD:4F44    G0:-|G:¿  G0:C|G:Ó  G0:M|G0:O  G0: |G0:P  G0:O|G0:D    G0Svc:02|G1 -"¿"  G0Svc:02|G1 -"Ó"  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  
-              PD:52CD  PD:4100  XD:0000  XD:0000  XD:0000    G0:R|G:Í  G0:A|B:00  _________  _________  _________    G0Svc:02|G1 -"Í"  G0Svc:02|B:NULL    _________________  _________________  _________________  
+              PD:2DBF  PD:43D3  PD:4D4F  PD:2050  PD:4F44    G0:-|G ¿  G0:C|G Ó  G0:M|G0:O  G0: |G0:P  G0:O|G0:D    G0Svc:02|G1: "¿"  G0Svc:02|G1: "Ó"  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  
+              PD:52CD  PD:4100  XD:0000  XD:0000  XD:0000    G0:R|G Í  G0:A|B:00  _________  _________  _________    G0Svc:02|G1: "Í"  G0Svc:02|B:NULL    _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Ch1 - "P" Svc2 - "-¿CÓMO PODRÍA" 
@@ -2538,7 +2538,7 @@ TEXT: Ch1 - "P" Svc2 - "-¿CÓMO PODRÍA"
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 
 00:00:16,057  F1:97A1  F2:97A1  PS:CB93  PD:912A  PD:0015    Ch1 - TAB  Ch3 - TAB  <--3|B:19  SPC |SPC1  SPC2|SPC3    __Tab-Offset: 1__  __Tab-Offset: 1__  <--3P022|B:19,S04  C1:{SPC}|0  2:2:2  0  0:0:0|RGB1:1:1  
-              PD:2D57  PD:4945  PD:204B  PD:D64E  PD:4E54    G0:-|G0:W  G0:I|G0:E  G0: |G0:K  G:Ö|G0:N  G0:N|G0:T    G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G1 -"Ö"|G0Svc:04  G0Svc:04|G0Svc:04  
+              PD:2D57  PD:4945  PD:204B  PD:D64E  PD:4E54    G0:-|G0:W  G0:I|G0:E  G0: |G0:K  G Ö|G0:N  G0:N|G0:T    G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G1: "Ö"|G0Svc:04  G0Svc:04|G0Svc:04  
               PD:4520  PD:4943  PD:4800  XD:0000  XD:0000    G0:E|G0:   G0:I|G0:C  G0:H|B:00  _________  _________    G0Svc:04|G0Svc:04  G0Svc:04|G0Svc:04  G0Svc:04|B:NULL    _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
@@ -3369,7 +3369,7 @@ TEXT: Ch1 - "ES" Svc6 - " "
 
 00:00:21,271  F1:45CE  F2:8080  F1:8080  PS:C323  PD:9201    Ch1: "EN"  F2 - NULL  F1 - NULL  <--3|B:03  SPL |SPL1    Chan-1:  "E"  "N"  608: Field 2 NULL  608: Field 1 NULL  <--3P006|B:03,S01  C1:{SPL}| Row-01   
               PD:0000  PS:0C75  PD:4341  PD:4445  PD:4155    SPL2|B:00  <--0|B:21  G0:C|G0:A  G0:D|G0:E  G0:A|G0:U     Col-00 |B:NULL    <--0P024|B:21,S03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  
-              PD:2044  PD:4520  PD:4649  PD:414E  PD:C741    G0: |G0:D  G0:E|G0:   G0:F|G0:I  G0:A|G0:N  G:Ç|G0:A    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G1 -"Ç"|G0Svc:03  
+              PD:2044  PD:4520  PD:4649  PD:414E  PD:C741    G0: |G0:D  G0:E|G0:   G0:F|G0:I  G0:A|G0:N  G Ç|G0:A    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G1: "Ç"|G0Svc:03  
               PD:494C  PD:4C00  PD:0300  XD:0000  XD:0000    G0:I|G0:L  G0:L|?00?  ETX |B:00  _________  _________    G0Svc:03|G0Svc:03  G0Svc:03|???-0x00  C0: ETX |B:NULL    _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Ch1 - "EN" Svc3 - "CADEAU DE FIANÇAILL" 
@@ -3636,7 +3636,7 @@ TEXT: Ch3 - "?"
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Svc1 - "- IS IT A WAFFLE TO" 
 
-00:00:22,981  F2:8080  F1:8080  PS:4A51  PD:2DBF  PD:4553    F2 - NULL  F1 - NULL  <--1|B:17  G0:-|G:¿  G0:E|G0:S    608: Field 2 NULL  608: Field 1 NULL  <--1P020|B:17,S02  G0Svc:02|G1 -"¿"  G0Svc:02|G0Svc:02  
+00:00:22,981  F2:8080  F1:8080  PS:4A51  PD:2DBF  PD:4553    F2 - NULL  F1 - NULL  <--1|B:17  G0:-|G ¿  G0:E|G0:S    608: Field 2 NULL  608: Field 1 NULL  <--1P020|B:17,S02  G0Svc:02|G1: "¿"  G0Svc:02|G0Svc:02  
               PD:2055  PD:4E41  PD:2054  PD:4F52  PD:5245    G0: |G0:U  G0:N|G0:A  G0: |G0:T  G0:O|G0:R  G0:R|G0:E    G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  G0Svc:02|G0Svc:02  
               PD:2044  PD:4500  XD:0000  XD:0000  XD:0000    G0: |G0:D  G0:E|B:00  _________  _________  _________    G0Svc:02|G0Svc:02  G0Svc:02|B:NULL    _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
@@ -3657,7 +3657,7 @@ TEXT: Svc3 - "-EST-CE QUE C'EST U"
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Svc4 - "WAFFEL-TURM?" 
 
-00:00:23,106  F1:8080  F2:8080  F1:8080  PS:0CB5  PD:2DC9    F1 - NULL  F2 - NULL  F1 - NULL  <--0|B:21  G0:-|G:É    608: Field 1 NULL  608: Field 2 NULL  608: Field 1 NULL  <--0P024|B:21,S05  G0Svc:05|G1 -"É"  
+00:00:23,106  F1:8080  F2:8080  F1:8080  PS:0CB5  PD:2DC9    F1 - NULL  F2 - NULL  F1 - NULL  <--0|B:21  G0:-|G É    608: Field 1 NULL  608: Field 2 NULL  608: Field 1 NULL  <--0P024|B:21,S05  G0Svc:05|G1: "É"  
               PD:2055  PD:4D41  PD:2054  PD:4F52  PD:5245    G0: |G0:U  G0:M|G0:A  G0: |G0:T  G0:O|G0:R  G0:R|G0:E    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
               PD:2044  PD:4520  PD:5741  PD:4600  PD:0300    G0: |G0:D  G0:E|G0:   G0:W|G0:A  G0:F|?00?  ETX |B:00    G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|???-0x00  C0: ETX |B:NULL    
               PS:4BD3  PD:2D18  PD:0627  PD:1806  PD:CC18    <--1|B:19  G0:-|P16?  P16?|P16?  P16?|P16?  P16?|P16?    <--1P022|B:19,S06  G0Svc:06|P16:UNH?  P16:06:1|P16:27:2  P16:UNH?|P16:06:1  P16:CC:2|P16:UNH?  
@@ -4035,7 +4035,7 @@ TEXT: Ch3 - "R" Svc4 - "-ICH MEINE, ES IST "
 
 00:00:25,567  F1:C1CE  F2:94F4  PS:4CB5  PD:2D51  PD:5545    Ch1: "AN"  Ch3 - PAC  <--1|B:21  G0:-|G0:Q  G0:U|G0:E    Chan-1:  "A"  "N"  Row:15  Column:08  <--1P024|B:21,S05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
               PD:524F  PD:2044  PD:495A  PD:4552  PD:2C20    G0:R|G0:O  G0: |G0:D  G0:I|G0:Z  G0:E|G0:R  G0:,|G0:     G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|G0Svc:05  
-              PD:C920  PD:554D  PD:2000  PD:0300  XD:0000    G:É|G0:   G0:U|G0:M  G0: |?00?  ETX |B:00  _________    G1 -"É"|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|???-0x00  C0: ETX |B:NULL    _________________  
+              PD:C920  PD:554D  PD:2000  PD:0300  XD:0000    G É|G0:   G0:U|G0:M  G0: |?00?  ETX |B:00  _________    G1: "É"|G0Svc:05  G0Svc:05|G0Svc:05  G0Svc:05|???-0x00  C0: ETX |B:NULL    _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
 TEXT: Ch1 - "AN" Svc5 - "-QUERO DIZER, É UM " 
@@ -4142,7 +4142,7 @@ TEXT: Svc6 - " "
 TEXT: Svc2 - "QUE ESO." 
 
 00:00:26,234  F1:942F  F2:8080  PS:476B  PD:912A  PD:0015    Ch1 {EOC}  F2 - NULL  <--1|B:11  SPC |SPC1  SPC2|SPC3    __End of Caption_  608: Field 2 NULL  <--1P014|B:11,S03  C1:{SPC}|0  2:2:2  0  0:0:0|RGB1:1:1  
-              PD:5155  PD:4520  PD:C741  PD:2E00  XD:0000    G0:Q|G0:U  G0:E|G0:   G:Ç|G0:A  G0:.|B:00  _________    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G1 -"Ç"|G0Svc:03  G0Svc:03|B:NULL    _________________  
+              PD:5155  PD:4520  PD:C741  PD:2E00  XD:0000    G0:Q|G0:U  G0:E|G0:   G Ç|G0:A  G0:.|B:00  _________    G0Svc:03|G0Svc:03  G0Svc:03|G0Svc:03  G1: "Ç"|G0Svc:03  G0Svc:03|B:NULL    _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
               XD:0000  XD:0000  XD:0000  XD:0000  XD:0000    _________  _________  _________  _________  _________    _________________  _________________  _________________  _________________  _________________  
