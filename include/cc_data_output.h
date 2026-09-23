@@ -75,6 +75,7 @@
 #define CEA708_CODE_C1_SPL                                      13
 #define CEA708_CODE_C1_SWA                                      14
 #define CEA708_CODE_C1_DFW                                      15
+#define CEA708_CODE_C3_VARIABLE                                 16
 
 
 /*----------------------------------------------------------------------------*/
