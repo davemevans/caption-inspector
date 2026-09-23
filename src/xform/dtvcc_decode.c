@@ -42,7 +42,6 @@ static const char* ccTypeStr[4] = { "F1", "F2", "PD", "PS" };
 
 static uint8 getPacketSize( const uint8 );
 static void processCurrentPacket( Context*, CaptionTime* );
-static uint16 countDataPackets( uint8*, uint8 );
 static void processServiceBlock( DtvccDecodeCtx*, uint8*, uint8, Buffer*, uint8, uint8 );
 static int8 parseC0CmdCode( DtvccDecodeCtx*, uint8*, uint8, DtvccData*, uint8 );
 static int8 parseC1CmdCode( DtvccDecodeCtx*, uint8*, uint8, DtvccData*, uint8, CaptionTime* );
@@ -439,8 +438,9 @@ static void processCurrentPacket( Context* rootCtxPtr, CaptionTime* captionTimeP
                  captionTimeStr, block_size, packetDataSize - packetDataIndex );
             block_size = packetDataSize - packetDataIndex;
         }
-        uint16 numDataPackets = countDataPackets( &packet_data[packetDataIndex], block_size );
-        Buffer* outBuffer = NewBuffer(BUFFER_TYPE_DTVCC, numDataPackets);
+        // Every element consumes at least one byte of the block, so the block size
+        // bounds the number of elements processServiceBlock() can produce.
+        Buffer* outBuffer = NewBuffer(BUFFER_TYPE_DTVCC, block_size);
         outBuffer->captionTime = *captionTimePtr;
 
         uint64 onService = 1;
@@ -461,107 +461,6 @@ static void processCurrentPacket( Context* rootCtxPtr, CaptionTime* captionTimeP
 
 /*------------------------------------------------------------------------------
  | NAME:
- |    countDataPackets()
- |
- | DESCRIPTION:
- |    This function counts the number of data packets in a given service block,
- |    which is done primarily for buffer size allocation.
- -------------------------------------------------------------------------------*/
-static uint16 countDataPackets( uint8* dataPtr, uint8 block_size ) {
-    uint8 index = 0;
-    uint16 numDataPackets = 0;
-    
-    while( index < block_size ) {
-        int8 used = LENGTH_UNKNOWN;
-        
-        if( dataPtr[index] != DTVCC_C0_EXT1 ) {
-            if( (dataPtr[index] >= DTVCC_MIN_C0_CODE) && (dataPtr[index] <= DTVCC_MAX_C0_CODE) ) {
-                numDataPackets = numDataPackets + 1;
-                if( dataPtr[index] <= 0x0F ) used = 1;
-                else if( dataPtr[index] <= 0x17 ) used = 2;
-                else if( dataPtr[index] <= DTVCC_MAX_C0_CODE ) used = 3;
-                else LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "Impossible Branch %02X", dataPtr[index] );
-            } else if( (dataPtr[index] >= DTVCC_MIN_G0_CODE) && (dataPtr[index] <= DTVCC_MAX_G0_CODE) ) {
-                numDataPackets = numDataPackets + 1;
-                used = 1;
-            } else if( (dataPtr[index] >= DTVCC_MIN_C1_CODE) && (dataPtr[index] <= DTVCC_MAX_C1_CODE) ) {
-                numDataPackets = numDataPackets + 1;
-                if( (dataPtr[index] == DTVCC_C1_CW0) || (dataPtr[index] == DTVCC_C1_CW1) || (dataPtr[index] == DTVCC_C1_CW2) ||
-                    (dataPtr[index] == DTVCC_C1_CW3) || (dataPtr[index] == DTVCC_C1_CW4) || (dataPtr[index] == DTVCC_C1_CW5) ||
-                    (dataPtr[index] == DTVCC_C1_CW6) || (dataPtr[index] == DTVCC_C1_CW7) || (dataPtr[index] == DTVCC_C1_DLC) ||
-                    (dataPtr[index] == DTVCC_C1_RST) || (dataPtr[0] == DTVCC_C1_RSV93)   || (dataPtr[0] == DTVCC_C1_RSV94)   ||
-                    (dataPtr[0] == DTVCC_C1_RSV95)   || (dataPtr[0] == DTVCC_C1_RSV96)) {
-                    used = 1;
-                } else if( (dataPtr[index] == DTVCC_C1_CLW) || (dataPtr[index] == DTVCC_C1_DSW) || (dataPtr[index] == DTVCC_C1_HDW) ||
-                           (dataPtr[index] == DTVCC_C1_TGW) || (dataPtr[index] == DTVCC_C1_DLW) || (dataPtr[index] == DTVCC_C1_DLY) ) {
-                    used = 2;
-                } else if( (dataPtr[index] == DTVCC_C1_SPA) || (dataPtr[index] == DTVCC_C1_SPL) ) {
-                    used = 3;
-                } else if( dataPtr[index] == DTVCC_C1_SPC ) {
-                    used = 4;
-                } else if( dataPtr[index] == DTVCC_C1_SWA ) {
-                    used = 5;
-                } else if( (dataPtr[index] == DTVCC_C1_DF0) || (dataPtr[index] == DTVCC_C1_DF1) || (dataPtr[index] == DTVCC_C1_DF2) ||
-                           (dataPtr[index] == DTVCC_C1_DF3) || (dataPtr[index] == DTVCC_C1_DF4) || (dataPtr[index] == DTVCC_C1_DF5) ||
-                           (dataPtr[index] == DTVCC_C1_DF6) || (dataPtr[index] == DTVCC_C1_DF7) ) {
-                    used = 7;
-                } else {
-                    LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "Impossible Branch: 0x%02X", dataPtr[0] );
-                    used = 1;
-                }
-            } else {
-                numDataPackets = numDataPackets + 1;
-                used = 1;
-            }
-            if( used == LENGTH_UNKNOWN ) {
-                LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "There was a problem handling the data. Reseting service decoder" );
-                return 25;
-            }
-        } else {  // Use Extended Set
-            if( (dataPtr[index+1] >= DTVCC_MIN_C0_CODE) && (dataPtr[index+1] <= DTVCC_MAX_C0_CODE) ) { // C2: Extended Misc. Control Codes
-                numDataPackets = numDataPackets + 1;
-                if( dataPtr[index+2] < 0x07 ) { // 00-07 : Single-byte control bytes (0 additional bytes)
-                    used = 2;
-                } else if( dataPtr[index+2] < 0x0F ) { // 08-0F : Two-byte control codes (1 additional byte)
-                    used = 3;
-                } else if( dataPtr[index+2] < 0x0F ) { // 10-17 : Three-byte control codes (2 additional bytes)
-                    used = 4;
-                } else {  // 18-1F : Four-byte control codes (3 additional bytes)
-                    used = 5;
-                }
-                LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping C2 Code: 0x%02X", dataPtr[1] );
-            } else if( (dataPtr[index+1] >= DTVCC_MIN_G0_CODE) && (dataPtr[index+1] <= DTVCC_MAX_G0_CODE) ) {  // G2: Extended Misc. Characters
-                numDataPackets = numDataPackets + 1;
-                used = 2;
-            } else if( (dataPtr[index+1] >= DTVCC_MIN_C1_CODE) && (dataPtr[index+1] <= DTVCC_MAX_C1_CODE) ) {
-                if( (dataPtr[index+2] < 0x80) || (dataPtr[index+2] > 0x9F) ) {
-                    LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "Skipping Invalid C3 Cmd: 0x%02X", dataPtr[index+2] );
-                } else if( dataPtr[index+2] <= 0x87 ) { // 80-87 : Five-byte control bytes (4 additional bytes)
-                    numDataPackets = numDataPackets + 1;
-                    used = 6;
-                } else if( dataPtr[index+2] <= 0x8F ) { // 88-8F : Six-byte control codes (5 additional byte)
-                    numDataPackets = numDataPackets + 1;
-                    used = 7;
-                } else {
-                    // 90-9F : These are variable length commands, that can even span several segments.
-                    // They were envisioned for things like downloading fonts and graphics.
-                    // We are not supporting this set of data.
-                    LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "Likely Data Corruption. Unsupported C3 Data Range: 0x%02X", dataPtr[index+2] );
-                    return 25;
-                }
-            } else {  // G3 Character Set (Basically just the [CC] Symbol).
-                numDataPackets = numDataPackets + 1;
-                used = 2;
-            }
-        }
-        index = index + used;
-    }
-    ASSERT(index == block_size);
-    return numDataPackets;
-}  // countDataPackets()
-
-/*------------------------------------------------------------------------------
- | NAME:
  |    processServiceBlock()
  |
  | DESCRIPTION:
@@ -578,7 +477,10 @@ static void processServiceBlock( DtvccDecodeCtx* ctxPtr, uint8* dataPtr, uint8 b
     while( index < block_size ) {
         int8 used = LENGTH_UNKNOWN;
         
-        ASSERT(outBuffer->numElements < outBuffer->maxNumElements);
+        if( outBuffer->numElements >= outBuffer->maxNumElements ) {
+            LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "Service block overflow, dropping the rest of the block" );
+            return;
+        }
         
         dtvccDataPtr = &(dtvccBufferDataPtr[outBuffer->numElements]);
         dtvccDataPtr->dtvccType = DTVCC_UNKNOWN;
@@ -620,29 +522,33 @@ static void processServiceBlock( DtvccDecodeCtx* ctxPtr, uint8* dataPtr, uint8 b
                 LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "There was a problem handling the data. Reseting service decoder" );
                 return;
             }
+        } else if( (index + 1) >= block_size ) {
+            LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Service block ends after EXT1, dropping it" );
+            outBuffer->numElements = outBuffer->numElements - 1;
+            return;
         } else {  // Use Extended Set
             if( (dataPtr[index+1] >= DTVCC_MIN_C0_CODE) && (dataPtr[index+1] <= DTVCC_MAX_C0_CODE) ) { // C2: Extended Misc. Control Codes
                 dtvccDataPtr->dtvccType = DTVCC_C2_CMD;
                 /* This section is for future codes. While by definition we can't do any work on them, we must advance */
                 /* however many bytes would be consumed if these codes were supported, as defined in the specs.        */
                 // WARN: This code is completely untested due to lack of samples. Just following specs!
-                if( dataPtr[index+2] < 0x07 ) { // 00-07 : Single-byte control bytes (0 additional bytes)
+                if( dataPtr[index+1] <= 0x07 ) { // 00-07 : Single-byte control bytes (0 additional bytes)
                     used = 2;
-                } else if( dataPtr[index+2] <0x0F ) { // 08-0F : Two-byte control codes (1 additional byte)
+                } else if( dataPtr[index+1] <= 0x0F ) { // 08-0F : Two-byte control codes (1 additional byte)
                     used = 3;
-                } else if( dataPtr[index+2] <0x0F ) { // 10-17 : Three-byte control codes (2 additional bytes)
+                } else if( dataPtr[index+1] <= 0x17 ) { // 10-17 : Three-byte control codes (2 additional bytes)
                     used = 4;
                 } else {  // 18-1F : Four-byte control codes (3 additional bytes)
                     used = 5;
                 }
-                LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping C2 Code: 0x%02X", dataPtr[1] );
+                LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping C2 Code: 0x%02X", dataPtr[index+1] );
             } else if( (dataPtr[index+1] >= DTVCC_MIN_G0_CODE) && (dataPtr[index+1] <= DTVCC_MAX_G0_CODE) ) {  // G2: Extended Misc. Characters
                 dtvccDataPtr->dtvccType = DTVCC_G2_CHAR;
-                if( (dataPtr[index+2] == 0x20) || (dataPtr[index+2] == 0x21) || (dataPtr[index+2] == 0x25) || (dataPtr[index+2] == 0x2A) ||
-                    (dataPtr[index+2] == 0x2C) || ((dataPtr[index+2] >= 0x30) && (dataPtr[index+2] <= 0x35)) || (dataPtr[index+2] == 0x39) ||
-                    (dataPtr[index+2] == 0x3A) || (dataPtr[index+2] == 0x3C) || (dataPtr[index+2] == 0x3D) || (dataPtr[index+2] == 0x3F) ||
-                    ((dataPtr[index+2] >= 0x76) && (dataPtr[index+2] <= 0x7F)) ) {
-                    dtvccDataPtr->data.g2char = dataPtr[index+2];
+                if( (dataPtr[index+1] == 0x20) || (dataPtr[index+1] == 0x21) || (dataPtr[index+1] == 0x25) || (dataPtr[index+1] == 0x2A) ||
+                    (dataPtr[index+1] == 0x2C) || ((dataPtr[index+1] >= 0x30) && (dataPtr[index+1] <= 0x35)) || (dataPtr[index+1] == 0x39) ||
+                    (dataPtr[index+1] == 0x3A) || (dataPtr[index+1] == 0x3C) || (dataPtr[index+1] == 0x3D) || (dataPtr[index+1] == 0x3F) ||
+                    ((dataPtr[index+1] >= 0x76) && (dataPtr[index+1] <= 0x7F)) ) {
+                    dtvccDataPtr->data.g2char = dataPtr[index+1];
                     LOG( DEBUG_LEVEL_VERBOSE, DBG_708_DEC, "G2: '%s'", DtvccDecodeG2CharSet(dtvccDataPtr->data.g2char) );
                     if( ctxPtr->foundText == NO_TEXT_FOUND ) {
                         ctxPtr->foundText = TEXT_FOUND;
@@ -651,28 +557,30 @@ static void processServiceBlock( DtvccDecodeCtx* ctxPtr, uint8* dataPtr, uint8 b
                         LOG(DEBUG_LEVEL_INFO, DBG_708_DEC, "DTVCC First Character of text found on Service %d at %s", srvcNum, captionTimeStr);
                     }
                 } else {
-                    LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping Unknown G2 Char: 0x%02X", dataPtr[index+2] );
+                    LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping Unknown G2 Char: 0x%02X", dataPtr[index+1] );
                     dtvccDataPtr->data.g2char = DTVCC_UNKNOWN_G2_CHAR;
                 }
                 used = 2;
             } else if( (dataPtr[index+1] >= DTVCC_MIN_C1_CODE) && (dataPtr[index+1] <= DTVCC_MAX_C1_CODE) ) {
                 dtvccDataPtr->dtvccType = DTVCC_C3_CMD;
-                if( (dataPtr[index+2] < 0x80) || (dataPtr[index+2] > 0x9F) ) {
-                    LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "Skipping Invalid C3 Cmd: 0x%02X", dataPtr[index+2] );
-                } else if( dataPtr[index+2] <= 0x87 ) { // 80-87 : Five-byte control bytes (4 additional bytes)
+                if( dataPtr[index+1] <= 0x87 ) { // 80-87 : Five-byte control bytes (4 additional bytes)
                     used = 6;
-                } else if( dataPtr[index+2] <= 0x8F ) { // 88-8F : Six-byte control codes (5 additional byte)
+                } else if( dataPtr[index+1] <= 0x8F ) { // 88-8F : Six-byte control codes (5 additional byte)
                     used = 7;
+                } else if( (index + 2) < block_size ) {
+                    // 90-9F : Variable-length commands, reserved for downloading fonts and graphics. A
+                    // header byte follows the command, and its low 5 bits are the number of data bytes
+                    // after it. Decoders skip the whole command (CTA-708-E 7.1.11.2).
+                    used = 3 + (dataPtr[index+2] & DTVCC_C3_VARIABLE_LENGTH_MASK);
+                    LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping Variable Length C3 Code: 0x%02X, %d bytes", dataPtr[index+1], used );
                 } else {
-                    // 90-9F : These are variable length commands, that can even span several segments.
-                    // They were envisioned for things like downloading fonts and graphics.
-                    // We are not supporting this set of data.
-                    LOG( DEBUG_LEVEL_ERROR, DBG_708_DEC, "Likely Data Corruption. Unsupported C3 Data Range: 0x%02X", dataPtr[index+2] );
+                    LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Variable Length C3 Code 0x%02X without its header", dataPtr[index+1] );
+                    used = block_size - index;
                 }
             } else {  // G3 Character Set (Basically just the [CC] Symbol).
                 dtvccDataPtr->dtvccType = DTVCC_G3_CHAR;
-                if( dataPtr[index+2] != DTVCC_G3_CC_ICON ) {
-                    dtvccDataPtr->data.g3char = dataPtr[index+2];
+                if( dataPtr[index+1] == DTVCC_G3_CC_ICON ) {
+                    dtvccDataPtr->data.g3char = dataPtr[index+1];
                     LOG( DEBUG_LEVEL_VERBOSE, DBG_708_DEC, "G3: '%s'", DtvccDecodeG2CharSet(dtvccDataPtr->data.g3char) );
                     if( ctxPtr->foundText == NO_TEXT_FOUND ) {
                         ctxPtr->foundText = TEXT_FOUND;
@@ -681,7 +589,7 @@ static void processServiceBlock( DtvccDecodeCtx* ctxPtr, uint8* dataPtr, uint8 b
                         LOG(DEBUG_LEVEL_INFO, DBG_708_DEC, "DTVCC First Character of text found on Service %d at %s", srvcNum, captionTimeStr);
                     }
                 } else {
-                    LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping Unknown G3 Char: 0x%02X", dataPtr[index+2] );
+                    LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Skipping Unknown G3 Char: 0x%02X", dataPtr[index+1] );
                     dtvccDataPtr->data.g3char = DTVCC_UNKNOWN_G3_CHAR;
                 }
                 used = 2;
@@ -692,11 +600,14 @@ static void processServiceBlock( DtvccDecodeCtx* ctxPtr, uint8* dataPtr, uint8 b
             LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Unexpectedly Skipping a buffer element" );
             outBuffer->numElements = outBuffer->numElements - 1;
         }
-        
+
+        if( (index + used) > block_size ) {
+            LOG( DEBUG_LEVEL_WARN, DBG_708_DEC, "Command 0x%02X runs past the end of the service block", dataPtr[index] );
+            return;
+        }
         index = index + used;
     }
     ASSERT(index == block_size);
-    ASSERT(outBuffer->numElements == outBuffer->maxNumElements);
 }  // processServiceBlock()
 
 /*------------------------------------------------------------------------------
