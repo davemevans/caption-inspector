@@ -997,15 +997,7 @@ static void decodePacketData( CcDataOutputCtx* ctxPtr, uint8 ccData, char* tagSt
         } else if( ctxPtr->cea708State == CEA708_STATE_EXTENDED_SRV_NUM ) {
             decodeServiceBlockHeaderExtension(ctxPtr, ccData, tagStr, decStr, errStr);
         } else if( ctxPtr->cea708State  == CEA708_STATE_DATA_WAIT ) {
-            if( ccData == 0 ) {
-    // HACK - TODO - What happens in the other decode for this?
-                len = snprintf(tagStr, CC_DATA_ELEMENT_HALF_TAG_STR_SIZE, "?00?");
-                ASSERT(len == (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE - 1));
-                len = snprintf(decStr, CC_DATA_ELEMENT_HALF_DEC_STR_SIZE, "?\?\?-0x00");
-                ASSERT(len == (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE - 1));
-    // HACK - Error, or no? There are lots in the bad asset...
-    //            LOG(DEBUG_LEVEL_WARN, DBG_CCD_OUT, "{%X} - Ignoring Spurious NULL on Srvc: %d", add708Error(ctxPtr, errStr), ctxPtr->currentService);
-            } else if( ccData != DTVCC_C0_EXT1 ) {
+            if( ccData != DTVCC_C0_EXT1 ) {
                 if ((ccData >= DTVCC_MIN_C0_CODE) && (ccData <= DTVCC_MAX_C0_CODE)) {
                     decodeC0CmdCode(ctxPtr, ccData, tagStr, decStr, errStr);
                 } else if ((ccData >= DTVCC_MIN_G0_CODE) && (ccData <= DTVCC_MAX_G0_CODE)) {
