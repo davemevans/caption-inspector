@@ -76,6 +76,7 @@ const char* DebugSectionText[MAX_DEBUG_SECTION] = {
 static boolean isInitialized = FALSE;
 
 static FILE* fpLog = NULL;
+static char logFilePath[MAX_FILE_NAME_LEN] = "";
 static EXTERNAL_DBG_FN_PTR DebugExternal = NULL;
 
 static uint8 dbgFileWriteLevel[MAX_DEBUG_SECTION] = {
@@ -163,14 +164,14 @@ void DebugInit( boolean writeToFile, char* filePathStr, EXTERNAL_DBG_FN_PTR extD
     numFatalErrors = 0;
     
     if( writeToFile == TRUE ) {
-        if( filePathStr != NULL ) {
-            fpLog = fopen(filePathStr, "w");
-            if(fpLog == NULL) LOG(DEBUG_LEVEL_FATAL, DBG_GENERAL, "Unable to Open File: %s - [Errno %d] %s", filePathStr, errno, strerror(errno));
-        } else {
+        if( filePathStr == NULL ) {
             sprintf(fileNameStr, "%d_%d_%d__%d_%d_%d__debug_log.txt", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-            fpLog = fopen(fileNameStr, "w");
-            if(fpLog == NULL) LOG(DEBUG_LEVEL_FATAL, DBG_GENERAL, "Unable to Open File: %s - [Errno %d] %s", fileNameStr, errno, strerror(errno));
+            filePathStr = fileNameStr;
         }
+        strncpy(logFilePath, filePathStr, MAX_FILE_NAME_LEN - 1);
+        logFilePath[MAX_FILE_NAME_LEN - 1] = '\0';
+        fpLog = fopen(filePathStr, "w");
+        if(fpLog == NULL) LOG(DEBUG_LEVEL_FATAL, DBG_GENERAL, "Unable to Open File: %s - [Errno %d] %s", filePathStr, errno, strerror(errno));
     }
 
     if( extDbgFn == NULL ) {
@@ -374,12 +375,8 @@ boolean DebugShutdown( void ) {
         printf("\nApplication finished with: %d Warnings and %d Errors\n", numWarnings,
                (numErrors + numFatalErrors) );
         
-        char filePath[PATH_MAX];
-        if (getcwd(filePath, sizeof(filePath)) != NULL) {
-            printf("Logfile Written: %s\n", filePath);
-        }
-        
         if( fpLog != NULL ) {
+            printf("Logfile Written: %s\n", logFilePath);
             fclose(fpLog);
         }
     }
