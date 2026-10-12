@@ -57,7 +57,7 @@ ifeq (run,$(firstword $(MAKECMDGOALS)))
   $(eval $(RUN_ARGS):;@:)
 endif
 
-.PHONY: all sharedlib clean build docker example
+.PHONY: all sharedlib clean build docker example caption-inspector ci_without_ffmpeg ci_with_gpac
 
 all:
 	cd src ; make all
