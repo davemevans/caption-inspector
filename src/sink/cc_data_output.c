@@ -86,6 +86,8 @@ LinkInfo CcDataOutInitialize( Context* rootCtxPtr ) {
     ctxPtr->wasHeaderWritten = FALSE;
     ctxPtr->currentChannel[0] = UNKOWN_CHANNEL;
     ctxPtr->currentChannel[1] = UNKOWN_CHANNEL;
+    ctxPtr->inXds[0] = FALSE;
+    ctxPtr->inXds[1] = FALSE;
     ctxPtr->last608Pair[0] = 0;
     ctxPtr->last608Pair[1] = 0;
     ctxPtr->currentService = UNKNOWN_SERVICE;
@@ -403,6 +405,12 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
     boolean isRepeat = (pair != 0) && (pair == ctxPtr->last608Pair[ccType]);
     ctxPtr->last608Pair[ccType] = (isRepeat == TRUE) ? 0 : pair;
 
+    // A caption control code interrupts an Extended Data Services packet on field 2.
+    if( (ccType == CC_DATA_TYPE__FIELD_2) && (ctxPtr->inXds[ccType] == TRUE) &&
+        (ccData1 >= PAC_FIRST_BYTE_FIRST) && (ccData1 <= PAC_FIRST_BYTE_LAST) ) {
+        ctxPtr->inXds[ccType] = FALSE;
+    }
+
     if( (ccData1 == 0) && (ccData2 == 0) ) {
         if( ccType == CC_DATA_TYPE__FIELD_1 ) {
             len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "F1 - NULL" );
@@ -415,6 +423,22 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
             len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "608: Field 2 NULL" );
             ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
         }
+    } else if( (ccType == CC_DATA_TYPE__FIELD_2) &&
+               (((ccData1 >= XDS_CTRL_FIRST) && (ccData1 <= XDS_CTRL_END)) || (ctxPtr->inXds[ccType] == TRUE)) ) {
+        len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "F2 - XDS " );
+        ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
+        if( ccData1 == XDS_CTRL_END ) {
+            ctxPtr->inXds[ccType] = FALSE;
+            len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "XDS End/Checksum " );
+        } else if( ccData1 >= XDS_CTRL_FIRST && ccData1 < XDS_CTRL_END ) {
+            static const char* xdsClass[7] = { "Current", "Future", "Channel", "Misc", "PublSvc", "Reservd", "Private" };
+            ctxPtr->inXds[ccType] = TRUE;
+            len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "XDS %-7s %-5s", xdsClass[(ccData1 - 1) / 2],
+                           (ccData1 & 0x01) ? "Start" : "Cont" );
+        } else {
+            len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "XDS Data   %02X %02X ", ccData1, ccData2 );
+        }
+        ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
     } else if( ((ccData1 == GLOBAL_CTRL_CODE_CC1) || (ccData1 == GLOBAL_CTRL_CODE_CC2) ||
                 (ccData1 == GLOBAL_CTRL_CODE_CC3) || (ccData1 == GLOBAL_CTRL_CODE_CC4)) &&
                ((ccData2 & GLOBAL_CTRL_CMD_MASK) == ccData2) && (ccData2 >= GLOBAL_CTRL_CMD_NORMALIZATION) ) {
