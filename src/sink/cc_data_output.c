@@ -86,6 +86,8 @@ LinkInfo CcDataOutInitialize( Context* rootCtxPtr ) {
     ctxPtr->wasHeaderWritten = FALSE;
     ctxPtr->currentChannel[0] = UNKOWN_CHANNEL;
     ctxPtr->currentChannel[1] = UNKOWN_CHANNEL;
+    ctxPtr->last608Pair[0] = 0;
+    ctxPtr->last608Pair[1] = 0;
     ctxPtr->currentService = UNKNOWN_SERVICE;
     ctxPtr->cea708ErrNum = 0;
     ctxPtr->cea708State = CEA708_STATE_UNKNOWN;
@@ -396,6 +398,11 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
     ASSERT(txtStr);
     ASSERT(outputPtr);
 
+    // Two-byte codes are sent twice and the second copy ignored (a third copy is a new code).
+    uint16 pair = (ccData1 << 8) | ccData2;
+    boolean isRepeat = (pair != 0) && (pair == ctxPtr->last608Pair[ccType]);
+    ctxPtr->last608Pair[ccType] = (isRepeat == TRUE) ? 0 : pair;
+
     if( (ccData1 == 0) && (ccData2 == 0) ) {
         if( ccType == CC_DATA_TYPE__FIELD_1 ) {
             len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "F1 - NULL" );
@@ -410,7 +417,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         }
     } else if( ((ccData1 == GLOBAL_CTRL_CODE_CC1) || (ccData1 == GLOBAL_CTRL_CODE_CC2) ||
                 (ccData1 == GLOBAL_CTRL_CODE_CC3) || (ccData1 == GLOBAL_CTRL_CODE_CC4)) &&
-               ((ccData2 & GLOBAL_CTRL_CMD_MASK) == ccData2) ) {
+               ((ccData2 & GLOBAL_CTRL_CMD_MASK) == ccData2) && (ccData2 >= GLOBAL_CTRL_CMD_NORMALIZATION) ) {
         switch( ccData1 ) {
             case GLOBAL_CTRL_CODE_CC1:
                 channelNum = 1;
@@ -501,7 +508,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
     } else if( ((ccData1 == CMD_MIDROW_BG_CHAN_1_3) || (ccData1 == CMD_MIDROW_FG_CHAN_1_3) ||
                 (ccData1 == CMD_MIDROW_BG_CHAN_2_4) || (ccData1 == CMD_MIDROW_FG_CHAN_2_4)) &&
-               ((ccData2 & MIDROW_CODE_MASK) == ccData2) ) {
+               (ccData2 >= MIDROW_CODE_FIRST) && (ccData2 <= MIDROW_CODE_LAST) ) {
         if( (ccData1 == CMD_MIDROW_BG_CHAN_1_3) || (ccData1 == CMD_MIDROW_FG_CHAN_1_3) ) {
             if( ccType == CC_DATA_TYPE__FIELD_1 ) {
                 channelNum = 1;
@@ -523,57 +530,57 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         if( (ccData1 & MIDROW_BG_FG_MASK) == MIDROW_FOREGROUND_STYLE ) {
             switch( ccData2 & MIDROW_FG_STYLE_MASK ) {
                 case MIDROW_FG_STYLE_WHITE:
-                    if ((ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:White - Transp");
+                    if ((ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:White - Undrln");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_____FG:White____");
                     }
                     break;
                 case MIDROW_FG_STYLE_GREEN:
-                    if ((ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Green - Transp");
+                    if ((ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Green - Undrln");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_____FG:Green____");
                     }
                     break;
                 case MIDROW_FG_STYLE_BLUE:
-                    if ((ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Blue -  Transp");
+                    if ((ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Blue -  Undrln");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_____FG:Blue_____");
                     }
                     break;
                 case MIDROW_FG_STYLE_CYAN:
-                    if ((ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Cyan -  Transp");
+                    if ((ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Cyan -  Undrln");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_____FG:Cyan_____");
                     }
                     break;
                 case MIDROW_FG_STYLE_RED:
-                    if ((ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Red  -  Transp");
+                    if ((ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Red  -  Undrln");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "______FG:Red_____");
                     }
                     break;
                 case MIDROW_FG_STYLE_YELLOW:
-                    if ((ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Yellw - Transp");
+                    if ((ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Yellw - Undrln");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "____FG:Yellow____");
                     }
                     break;
                 case MIDROW_FG_STYLE_MAGENTA:
-                    if ((ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Mgnta - Transp");
+                    if ((ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Mgnta - Undrln");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "____FG:Magenta___");
                     }
                     break;
                 case MIDROW_FG_STYLE_ITALIC_WHITE:
-                    if ((ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:ItWht - Transp");
+                    if ((ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:ItWht - Undrln");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Italics  White");
                     }
@@ -586,57 +593,57 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         } else {
             switch(ccData2 & MIDROW_BG_COLOR_MASK) {
                 case MIDROW_BG_COLOR_WHITE:
-                    if( (ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE ) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:White - Undrln");
+                    if( (ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT ) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:White - SemiTr");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_____BG:White____");
                     }
                     break;
                 case MIDROW_BG_COLOR_GREEN:
-                    if( (ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE ) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Green - Undrln");
+                    if( (ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT ) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Green - SemiTr");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_____BG:Green____");
                     }
                     break;
                 case MIDROW_BG_COLOR_BLUE:
-                    if( (ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE ) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Blue -  Undrln");
+                    if( (ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT ) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Blue -  SemiTr");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_____BG:Blue_____");
                     }
                     break;
                 case MIDROW_BG_COLOR_CYAN:
-                    if( (ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE ) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Cyan -  Undrln");
+                    if( (ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT ) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Cyan -  SemiTr");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_____BG:Cyan_____");
                     }
                     break;
                 case MIDROW_BG_COLOR_RED:
-                    if( (ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE ) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Red  -  Undrln");
+                    if( (ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT ) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Red  -  SemiTr");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "______BG:Red_____");
                     }
                     break;
                 case MIDROW_BG_COLOR_YELLOW:
-                    if( (ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE ) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Yellw - Undrln");
+                    if( (ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT ) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Yellw - SemiTr");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "____BG:Yellow____");
                     }
                     break;
                 case MIDROW_BG_COLOR_MAGENTA:
-                    if( (ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE ) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Mgnta - Undrln");
+                    if( (ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT ) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Mgnta - SemiTr");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "____BG:Magenta___");
                     }
                     break;
                 case MIDROW_BG_COLOR_BLACK:
-                    if( (ccData2 & MIDROW_UNDERLINE_MASK) == MIDROW_UNDERLINE ) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Black - Undrln");
+                    if( (ccData2 & MIDROW_TRANSPARENCY_MASK) == MIDROW_PARTIALLY_TRANSPARENT ) {
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "BG:Black - SemiTr");
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_____BG:Black____");
                     }
@@ -647,7 +654,26 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
             }
             ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
         }
-    } else if( ((ccData1 == CMD_TAB_HI_CC_1_3) || (ccData1 == CMD_TAB_HI_CC_2_4)) && ((ccData2 & TAB_CMD_MASK) == ccData2) ) {
+    } else if( ((ccData1 == CMD_TAB_HI_CC_1_3) || (ccData1 == CMD_TAB_HI_CC_2_4)) &&
+               ((ccData2 == CMD_BG_TRANSPARENT) || (ccData2 == CMD_FG_BLACK) || (ccData2 == CMD_FG_BLACK_UNDERLINE)) ) {
+        if( ccData1 == CMD_TAB_HI_CC_1_3 ) {
+            channelNum = (ccType == CC_DATA_TYPE__FIELD_1) ? 1 : 3;
+        } else {
+            channelNum = (ccType == CC_DATA_TYPE__FIELD_1) ? 2 : 4;
+        }
+        ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
+
+        len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d - MDR", channelNum );
+        ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
+        if( ccData2 == CMD_BG_TRANSPARENT ) {
+            len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_BG:Transparent__");
+        } else if( ccData2 == CMD_FG_BLACK ) {
+            len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "_____FG:Black____");
+        } else {
+            len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "FG:Black - Undrln");
+        }
+        ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
+    } else if( ((ccData1 == CMD_TAB_HI_CC_1_3) || (ccData1 == CMD_TAB_HI_CC_2_4)) && (ccData2 >= TAB_CMD_TO1) && (ccData2 <= TAB_CMD_TO3) ) {
         if( ccData1 == CMD_TAB_HI_CC_1_3 ) {
             if( ccType == CC_DATA_TYPE__FIELD_1 ) {
                 channelNum = 1;
@@ -667,7 +693,21 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "__Tab-Offset: %d__", (ccData2 & 0x0F) );
         ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
-    } else if( (ccData1 & PAC_CC1_MASK) == ccData1 ) {
+    } else if( ((ccData1 == CMD_TAB_HI_CC_1_3) || (ccData1 == CMD_TAB_HI_CC_2_4)) && (ccData2 >= CHARSET_CMD_FIRST) && (ccData2 <= CHARSET_CMD_LAST) ) {
+        static const char* charSetName[7] = { "Std Norm", "Std Dbl_", "Private1", "Private2", "GB2312__", "KSC5601_", "Reg1____" };
+        if( ccData1 == CMD_TAB_HI_CC_1_3 ) {
+            channelNum = (ccType == CC_DATA_TYPE__FIELD_1) ? 1 : 3;
+        } else {
+            channelNum = (ccType == CC_DATA_TYPE__FIELD_1) ? 2 : 4;
+        }
+
+        len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d - CHS", channelNum );
+        ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
+        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "CharSet: %s", charSetName[ccData2 - CHARSET_CMD_FIRST] );
+        ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
+    } else if( (ccData1 >= PAC_FIRST_BYTE_FIRST) && (ccData1 <= PAC_FIRST_BYTE_LAST) &&
+               (ccData2 >= PAC_SECOND_BYTE_FIRST) && (ccData2 <= PAC_SECOND_BYTE_LAST) &&
+               (((ccData1 & ~PAC_CHANNEL_MASK) != PAC_FIRST_BYTE_FIRST) || (ccData2 <= PAC_ROW_11_SECOND_BYTE_LAST)) ) {
         if( (ccData1 & PAC_CHANNEL_MASK) == PAC_CHANNEL_1_3 ) {
             if( ccType == CC_DATA_TYPE__FIELD_1 ) {
                 channelNum = 1;
@@ -719,7 +759,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                     break;
                 case PAC_CURSOR_COLUMN_16:
                     if( (ccData2 & PAC_UNDERLINE_MASK) == PAC_UNDERLINE ) {
-                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Row:%02d  Col:60-UL", rowNumber);
+                        len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Row:%02d  Col:16-UL", rowNumber);
                     } else {
                         len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Row:%02d  Column:16", rowNumber);
                     }
@@ -815,7 +855,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
             ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
         }
     } else if( ((ccData1 == SPCL_NA_CHAR_SET_CH_1_3) || (ccData1 == SPCL_NA_CHAR_SET_CH_2_4)) &&
-               ((ccData2 & SPCL_NA_CHAR_SET_MASK) == ccData2) ) {
+               (ccData2 >= SPCL_NA_CHAR_FIRST) && (ccData2 <= SPCL_NA_CHAR_LAST) ) {
         if( ccData1 == SPCL_NA_CHAR_SET_CH_1_3 ) {
             if( ccType == CC_DATA_TYPE__FIELD_1 ) {
                 channelNum = 1;
@@ -831,15 +871,20 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         }
         ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
 
-        snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d  \"%s\"", channelNum, Line21DecodeSpecialCharacter(ccData2 & SPCL_NA_CHAR_MASK) );
+        // Glyphs are 1-3 bytes of UTF-8; narrow the gap so the closing quote still fits.
+        snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, (strlen(Line21DecodeSpecialCharacter(ccData2)) > 2) ? "Ch%d \"%s\"" : "Ch%d  \"%s\"",
+                 channelNum, Line21DecodeSpecialCharacter(ccData2) );
         if( strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-2) ) {
             strcat(outputPtr->tagStr, " ");
         }
         ASSERT(strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
-        appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeSpecialCharacter(ccData2 & SPCL_NA_CHAR_MASK));
+        if( isRepeat == FALSE ) {
+            appendText(txtStr->txtStr608[channelNum-1], Line21DecodeSpecialCharacter(ccData2));
+        }
     } else if( ((ccData1 == EXT_W_EURO_CHAR_SET_CH_1_3_SF) || (ccData1 == EXT_W_EURO_CHAR_SET_CH_1_3_FG) ||
                 (ccData1 == EXT_W_EURO_CHAR_SET_CH_2_4_SF) || (ccData1 == EXT_W_EURO_CHAR_SET_CH_2_4_FG)) &&
-               ((ccData2 & EXT_W_EURO_CHAR_SET_MASK) == ccData2) ) {
+               (ccData2 >= EXT_W_EURO_CHAR_FIRST) && (ccData2 <= EXT_W_EURO_CHAR_LAST) ) {
+        uint8 charSet = ((ccData1 & EXT_W_EURO_CHAR_SET_SELECT_MASK) == 0) ? EXT_W_EURO_CHAR_SET_SPANISH_FRENCH : EXT_W_EURO_CHAR_SET_DUTCH_GERMAN;
 
         if( (ccData1 == EXT_W_EURO_CHAR_SET_CH_1_3_SF) || (ccData1 == EXT_W_EURO_CHAR_SET_CH_2_4_SF) ) {
             if( (ccData2 & EXT_W_EURO_CHAR_SET_TOGGLE_MASK) == EXT_W_EURO_CHAR_SET_TOGGLE_MASK ) {
@@ -863,26 +908,22 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
             } else {
                 channelNum = 3;
             }
-            ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
-            snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d  \"%s\"", channelNum, Line21DecodeExtendedCharacter(EXT_W_EURO_CHAR_SET_SPANISH_FRENCH, ccData2));
-            if( strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-2) ) {
-                strcat(outputPtr->tagStr, " ");
-            }
-            ASSERT(strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
-            appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeExtendedCharacter(EXT_W_EURO_CHAR_SET_SPANISH_FRENCH, ccData2));
         } else {
             if( ccType == CC_DATA_TYPE__FIELD_1 ) {
                 channelNum = 2;
             } else {
                 channelNum = 4;
             }
-            ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
-            snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d  \"%s\"", channelNum, Line21DecodeExtendedCharacter(EXT_W_EURO_CHAR_SET_DUTCH_GERMAN, ccData2));
-            if( strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-2) ) {
-                strcat(outputPtr->tagStr, " ");
-            }
-            ASSERT(strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
-            appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeExtendedCharacter(EXT_W_EURO_CHAR_SET_DUTCH_GERMAN, ccData2));
+        }
+        ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
+        snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, (strlen(Line21DecodeExtendedCharacter(charSet, ccData2)) > 2) ? "Ch%d \"%s\"" : "Ch%d  \"%s\"",
+                 channelNum, Line21DecodeExtendedCharacter(charSet, ccData2));
+        if( strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-2) ) {
+            strcat(outputPtr->tagStr, " ");
+        }
+        ASSERT(strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
+        if( isRepeat == FALSE ) {
+            appendText(txtStr->txtStr608[channelNum-1], Line21DecodeExtendedCharacter(charSet, ccData2));
         }
     } else if( (((ccData1 >= FIRST_BASIC_CHAR) && (ccData1 <= LAST_BASIC_CHAR)) || (ccData1 == NULL_BASIC_CHAR)) &&
                (((ccData2 >= FIRST_BASIC_CHAR) && (ccData2 <= LAST_BASIC_CHAR)) || (ccData2 == NULL_BASIC_CHAR)) ) {
@@ -911,8 +952,10 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                                Line21DecodeBasicNACharacter(ccData1), Line21DecodeBasicNACharacter(ccData2));
                 ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
             }
-            appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData1));
-            appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData2));
+            if( ctxPtr->currentChannel[ccType] != UNKOWN_CHANNEL ) {
+                appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData1));
+                appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData2));
+            }
         } else if( (ccData1 != 0) && (ccData2 == 0) ) {
             if( strlen(Line21DecodeBasicNACharacter(ccData1)) == 1 ) {
                 len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d - \"%s\"", ctxPtr->currentChannel[ccType], Line21DecodeBasicNACharacter(ccData1));
@@ -927,7 +970,9 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                                Line21DecodeBasicNACharacter(ccData1));
                 ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
             }
-            appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData1));
+            if( ctxPtr->currentChannel[ccType] != UNKOWN_CHANNEL ) {
+                appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData1));
+            }
         } else {
             ASSERT(0);
         }

@@ -52,8 +52,8 @@ static char* normalizedSpecialNaCharSet[16] = { // int not char for Special Char
 };
 
 static char* normalizedExtendedWeCharSet1[32] = { // int not char for Special Characters
-        "Á",  "É",  "Ó",  "Ú",  "Ü",  "ü",  "´",  "¡",  // Spanish
-        "*", "\"",  "-",  "©",  "℠",  "·", "\"", "\"",  // Miscellanous
+        "Á",  "É",  "Ó",  "Ú",  "Ü",  "ü",  "‘",  "¡",  // Spanish
+        "*",  "’",  "—",  "©",  "℠",  "•",  "“",  "”",  // Miscellanous
         "À",  "Â",  "Ç",  "È",  "Ê",  "Ë",  "ë",  "Î",  // French
         "Ï",  "ï",  "Ô",  "Ù",  "ù",  "Û",  "«",  "»"
 };
@@ -61,8 +61,8 @@ static char* normalizedExtendedWeCharSet1[32] = { // int not char for Special Ch
 static char* normalizedExtendedWeCharSet2[32] = { // int not char for Special Characters
         "Ã",  "ã",  "Í",  "Ì",  "ì",  "Ò",  "ò",  "Õ",  // Portuguese
         "õ",  "{",  "}", "\\",  "^",  "_",  "|",  "~",
-        "Ä",  "ä",  "Ö",  "ö",  "ß",  "¥",  "¤",  "|",  // German
-        "Å",  "å",  "Ø",  "ø",  "+",  "+",  "+",  "+"   // Danish
+        "Ä",  "ä",  "Ö",  "ö",  "ß",  "¥",  "¤",  "│",  // German
+        "Å",  "å",  "Ø",  "ø",  "┌",  "┐",  "└",  "┘"   // Danish
 };
 
 static char* controlCodeShortName[17] = {
@@ -70,16 +70,16 @@ static char* controlCodeShortName[17] = {
         "FON", "RDC", "TR", "RTD", "EDM", "CR", "ENM", "EOC", "ERR"
 };
 
-static char* tabControlCodeDescrShort[4] = {
-        "ERR", "TO1", "TO2", "TO3"
+static char* tabControlCodeDescrShort[11] = {
+        "ERR", "TO1", "TO2", "TO3", "CS-Std", "CS-Dbl", "CS-Priv1", "CS-Priv2", "CS-GB", "CS-KSC", "CS-Reg1"
 };
 
-static char* styleNameFull[9] = {
-        "White", "Green", "Blue", "Cyan", "Red", "Yellow", "Magenta", "Italic-White", "Unknown"
+static char* styleNameFull[10] = {
+        "White", "Green", "Blue", "Cyan", "Red", "Yellow", "Magenta", "Italic-White", "Unknown", "Black"
 };
 
-static char* colorNameFull[9] = {
-        "White", "Green", "Blue", "Cyan", "Red", "Yellow", "Magenta", "Black", "Unknown"
+static char* colorNameFull[10] = {
+        "White", "Green", "Blue", "Cyan", "Red", "Yellow", "Magenta", "Black", "Unknown", "Transparent"
 };
 
 /*----------------------------------------------------------------------------*/
@@ -282,8 +282,8 @@ char* Line21DecodeSpecialCharacter( uint8 specialCharCode ) {
  -------------------------------------------------------------------------------*/
 char* Line21DecodeExtendedCharacter( uint8 charSet, uint8 extendedCharCode ) {
     if( ((charSet != EXT_W_EURO_CHAR_SET_SPANISH_FRENCH) && (charSet != EXT_W_EURO_CHAR_SET_DUTCH_GERMAN)) ||
-        !((charSet>0x1F) && (charSet<0x40)) ) {
-        LOG( DEBUG_LEVEL_ERROR, DBG_608_OUT, "Invalid Extended Character Code: 0x%02X 0x%02X", extendedCharCode );
+        !((extendedCharCode > 0x1F) && (extendedCharCode < 0x40)) ) {
+        LOG( DEBUG_LEVEL_ERROR, DBG_608_OUT, "Invalid Extended Character Code: %d 0x%02X", charSet, extendedCharCode );
         return BARF;
     }
 
@@ -332,7 +332,7 @@ char* Line21GlobalCtrlCodeToString( uint8 globalCtrlCode ) {
  |    terminated reference to the string in memory
  -------------------------------------------------------------------------------*/
 char* Line21TabOffsetCodeToString( uint8 tabOffsetCode ) {
-    if( (tabOffsetCode > 0x1F) && (tabOffsetCode < 0x24) ) {
+    if( (tabOffsetCode > 0x1F) && (tabOffsetCode <= CHARSET_CMD_LAST) ) {
         return tabControlCodeDescrShort[(tabOffsetCode & 0x0F)];
     } else {
         LOG( DEBUG_LEVEL_ERROR, DBG_608_OUT, "Invalid Tab Offset Code: 0x%02X", tabOffsetCode );
@@ -352,7 +352,9 @@ char* Line21TabOffsetCodeToString( uint8 tabOffsetCode ) {
  |    This function decodes the Style Code into Text.
  -------------------------------------------------------------------------------*/
 static char* Line21StyleCodeToString( uint8 styleCode ) {
-    if( ((styleCode & 0x01) == 0x00) && (styleCode < 0x0F) ) {
+    if( styleCode == MIDROW_FG_STYLE_BLACK ) {
+        return styleNameFull[9];
+    } else if( ((styleCode & 0x01) == 0x00) && (styleCode < 0x0F) ) {
         return styleNameFull[(styleCode >> 0x01)];
     } else {
         LOG( DEBUG_LEVEL_ERROR, DBG_608_OUT, "Invalid PAC Style Code: 0x%02X", styleCode );
@@ -368,7 +370,9 @@ static char* Line21StyleCodeToString( uint8 styleCode ) {
  |    This function decodes the Color Code into Text.
  -------------------------------------------------------------------------------*/
 static char* Line21ColorCodeToString( uint8 colorCode ) {
-    if( ((colorCode & 0x01) == 0x00) && (colorCode < 0x0F) ) {
+    if( colorCode == MIDROW_BG_COLOR_TRANSPARENT ) {
+        return colorNameFull[9];
+    } else if( ((colorCode & 0x01) == 0x00) && (colorCode < 0x0F) ) {
         return colorNameFull[(colorCode >> 0x01)];
     } else {
         LOG( DEBUG_LEVEL_ERROR, DBG_608_OUT, "Invalid PAC Color Code: 0x%02X", colorCode );
@@ -388,7 +392,8 @@ static void writeLine21codeToText( Line21OutputCtx* ctxPtr, Line21Code codeToDec
     uint8 fileIdx = codeToDecode.channelNum - 1;
     ASSERT(ctxPtr->fp[fileIdx]);
 
-    if( codeToDecode.codeType == LINE21_BASIC_CHARS ) {
+    if( (codeToDecode.codeType == LINE21_BASIC_CHARS) || (codeToDecode.codeType == LINE21_SPECIAL_CHAR) ||
+        (codeToDecode.codeType == LINE21_EXTENDED_CHAR) ) {
         if( ctxPtr->textStream[fileIdx] == FALSE ) {
             writeToFile(ctxPtr->fp[fileIdx], " \"");
             ctxPtr->textStream[fileIdx] = TRUE;
@@ -461,15 +466,13 @@ static void writeLine21codeToText( Line21OutputCtx* ctxPtr, Line21Code codeToDec
             } else {
                 writeToFile(ctxPtr->fp[fileIdx], " {BG-%s", Line21ColorCodeToString(codeToDecode.code.midRow.backgroundForgroundData.color));
             }
-            if( (codeToDecode.code.midRow.isPartiallyTransparent == TRUE) && (codeToDecode.code.midRow.isUnderlined == TRUE) ) {
-                writeToFile(ctxPtr->fp[fileIdx], ":PT:UL}");
-            } else if( (codeToDecode.code.midRow.isPartiallyTransparent == TRUE) && (codeToDecode.code.midRow.isUnderlined == FALSE) ) {
-                writeToFile(ctxPtr->fp[fileIdx], "PT}");
-            } else if( (codeToDecode.code.midRow.isPartiallyTransparent == FALSE) && (codeToDecode.code.midRow.isUnderlined == TRUE) ) {
-                writeToFile(ctxPtr->fp[fileIdx], "UL}");
-            } else {
-                writeToFile(ctxPtr->fp[fileIdx], "}");
+            if( codeToDecode.code.midRow.isPartiallyTransparent == TRUE ) {
+                writeToFile(ctxPtr->fp[fileIdx], ":PT");
             }
+            if( codeToDecode.code.midRow.isUnderlined == TRUE ) {
+                writeToFile(ctxPtr->fp[fileIdx], ":UL");
+            }
+            writeToFile(ctxPtr->fp[fileIdx], "}");
             break;
         case LINE21_NULL_DATA:
         case LINE21_CODE_TYPE_UNKNOWN:
