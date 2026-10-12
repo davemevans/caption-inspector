@@ -14,15 +14,12 @@ CAPTION_INSPECTOR_VERSION = '???'
 def compare_text(first, second, ctr, ignore):
     if ctr in ignore:
         return True
-    retval = True
-    for loop in range(len(first)):
-        if first[loop] != second[loop]:
-            retval = False
-            print("Different [Line-%d]: " % ctr)
-            d = difflib.Differ()
-            diff = d.compare(first[loop], second[loop])
-            print("".join(diff))
-    return retval
+    if first == second:
+        return True
+    print("Different [Line-%d]: " % ctr)
+    d = difflib.Differ()
+    print("".join(d.compare([first], [second])))
+    return False
 
 
 def compare_files(generated_file, master_file, ignore):
@@ -35,6 +32,11 @@ def compare_files(generated_file, master_file, ignore):
         identical = compare_text(generated_line, master_line, counter, ignore)
         assert identical is True
         generated_line = generated_file.readline()
+    # Output that stops short of the master (e.g. lost trailing captions) is a failure too.
+    master_line = master_file.readline()
+    if master_line:
+        print("Generated file ends at line %d, master continues: %s" % (counter, master_line))
+    assert not master_line
 
 
 class TestClass(object):
