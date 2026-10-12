@@ -11,15 +11,12 @@ CAPTION_INSPECTOR_LIBRARY = './libci-test.1.0.0.dylib'
 def compare_text(first, second, ctr, ignore):
     if ctr in ignore:
         return True
-    retval = True
-    for loop in range(len(first)):
-        if first[loop] != second[loop]:
-            retval = False
-            print("Different [Line-%d]: " % ctr)
-            d = difflib.Differ()
-            diff = d.compare(first[loop], second[loop])
-            print("".join(diff))
-    return retval
+    if first == second:
+        return True
+    print("Different [Line-%d]: " % ctr)
+    d = difflib.Differ()
+    print("".join(d.compare([first], [second])))
+    return False
 
 
 def compare_files(generated_file, master_file, ignore):
@@ -32,6 +29,11 @@ def compare_files(generated_file, master_file, ignore):
         identical = compare_text(generated_line, master_line, counter, ignore)
         assert identical is True
         generated_line = generated_file.readline()
+    # Output that stops short of the master (e.g. lost trailing captions) is a failure too.
+    master_line = master_file.readline()
+    if master_line:
+        print("Generated file ends at line %d, master continues: %s" % (counter, master_line))
+    assert not master_line
 
 
 class TestClass(object):
@@ -84,6 +86,28 @@ class TestClass(object):
         os.remove("./tmp/NightOfTheLivingDead-S1.708")
         os.remove("./tmp/NightOfTheLivingDead.ccd")
         os.removedirs("./tmp")
+
+    def test__EA_Establish_HEVC_Pipeline(self):
+        # BigBuckBunny_256x144-24fps-hevc.ts is the H.264 BigBuckBunny asset re-encoded to HEVC with its
+        # captions carried as A/53 SEI, so it must decode to the same 608/708 output as the H.264 masters.
+        clib = ctypes.CDLL(CAPTION_INSPECTOR_LIBRARY)
+        if os.path.exists('./tmp') is not True:
+            os.mkdir('tmp')
+        retval = clib.ExtrnlAdptrPlumbMpegPipeline('../media/BigBuckBunny_256x144-24fps-hevc.ts'.encode('utf-8'),
+                                                   './tmp'.encode('utf-8'), 1)
+        assert retval is 1
+        clib.ExtrnlAdptrDriveDecodePipeline()
+        for suffix in ['C1.608', 'C3.608', 'S1.708', 'S2.708', 'S3.708', 'S4.708', 'S5.708', 'S6.708']:
+            generated_name = './tmp/BigBuckBunny_256x144-24fps-hevc-' + suffix
+            assert os.path.exists(generated_name.encode('utf-8')) is True
+            generated_file = open(generated_name, "r")
+            master_file = open('../media/BigBuckBunny_256x144-24fps-' + suffix, "r")
+            compare_files(generated_file, master_file, [1])  # line 1 names the asset
+            generated_file.close()
+            master_file.close()
+        for leftover in os.listdir('./tmp'):
+            if leftover.startswith('BigBuckBunny_256x144-24fps-hevc'):
+                os.remove('./tmp/' + leftover)
 
     def test__EA_Establish_MPG_Pipeline_w_Artifacts(self):
         clib = ctypes.CDLL(CAPTION_INSPECTOR_LIBRARY)
