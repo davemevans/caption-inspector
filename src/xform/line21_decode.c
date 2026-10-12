@@ -34,6 +34,7 @@
 /*--                     Private Member Declarations                        --*/
 /*----------------------------------------------------------------------------*/
 
+static boolean isXdsPair( Line21DecodeCtx*, uint8, uint8 );
 static boolean isRedundantPair( Line21DecodeCtx*, uint8, uint8, uint8 );
 static boolean decodeCaptionData( Line21DecodeCtx*, uint8, uint8, Line21Code*, CaptionTime* );
 static boolean decodeGlobalCmd( Line21DecodeCtx*, uint8, uint8, Line21Code*, CaptionTime* );
@@ -76,6 +77,8 @@ LinkInfo Line21DecodeInitialize( Context* rootCtxPtr, boolean processOnly ) {
     ctxPtr->foundText = NO_TEXT_FOUND;
     ctxPtr->currentChannel[CEA608E_LINE21_FIELD_1_CC] = LINE21_CHANNEL_UNKONWN;
     ctxPtr->currentChannel[CEA608E_LINE21_FIELD_2_CC] = LINE21_CHANNEL_UNKONWN;
+    ctxPtr->inXds[CEA608E_LINE21_FIELD_1_CC] = FALSE;
+    ctxPtr->inXds[CEA608E_LINE21_FIELD_2_CC] = FALSE;
     ctxPtr->lastPair[CEA608E_LINE21_FIELD_1_CC] = 0;
     ctxPtr->lastPair[CEA608E_LINE21_FIELD_2_CC] = 0;
     for( int loop = 0; loop <= LINE21_MAX_NUM_CHANNELS; loop++ ) {
@@ -196,6 +199,10 @@ uint8 Line21DecodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
                 codePtr->fieldNum = CEA608E_LINE21_FIELD_2_CC;
             }
 
+            if( isXdsPair(ctxPtr, codePtr->fieldNum, inBuffer->dataPtr[loop+1]) == TRUE ) {
+                continue;
+            }
+
             codePtr->codeType = LINE21_CODE_TYPE_UNKNOWN;
 
             boolean wasDecoded = decodeCaptionData(ctxPtr, inBuffer->dataPtr[loop+1], inBuffer->dataPtr[loop+2], codePtr, &inBuffer->captionTime);
@@ -218,6 +225,10 @@ uint8 Line21DecodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
     }
 
     FreeBuffer(inBuffer);
+    if( outBuffer->numElements == 0 ) {
+        FreeBuffer(outBuffer);
+        return PIPELINE_SUCCESS;
+    }
     if( ((Context*)rootCtxPtr)->line21DecodeCtxPtr->processOnly == TRUE ) {
         FreeBuffer(outBuffer);
         if( ctxPtr->foundText == TEXT_FOUND ) {
@@ -374,6 +385,37 @@ uint8 Line21PacDecodeRow( uint8 ccData1, uint8 ccData2 ) {
 /*----------------------------------------------------------------------------*/
 /*--                       Private Member Functions                         --*/
 /*----------------------------------------------------------------------------*/
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    isXdsPair()
+ |
+ | DESCRIPTION:
+ |    This function tracks Extended Data Services packets on field 2 and returns
+ |    TRUE for any byte pair that belongs to one, so it is not decoded as captions.
+ -------------------------------------------------------------------------------*/
+static boolean isXdsPair( Line21DecodeCtx* ctxPtr, uint8 fieldNum, uint8 firstByte ) {
+    firstByte = firstByte & LINE_21_PARITY_MASK;
+
+    if( fieldNum != CEA608E_LINE21_FIELD_2_CC ) {
+        return FALSE;
+    }
+
+    if( (firstByte >= XDS_CTRL_FIRST) && (firstByte <= XDS_CTRL_END) ) {
+        ctxPtr->inXds[fieldNum] = (firstByte != XDS_CTRL_END);
+        return TRUE;
+    }
+
+    if( ctxPtr->inXds[fieldNum] == TRUE ) {
+        if( (firstByte >= PAC_FIRST_BYTE_FIRST) && (firstByte <= PAC_FIRST_BYTE_LAST) ) {
+            ctxPtr->inXds[fieldNum] = FALSE;  // A caption control code ends the XDS packet
+            return FALSE;
+        }
+        return TRUE;
+    }
+
+    return FALSE;
+}  // isXdsPair()
 
 /*------------------------------------------------------------------------------
  | NAME:

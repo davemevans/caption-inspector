@@ -231,6 +231,18 @@
 #define EXT_W_EURO_CHAR_LAST                                             0x3F
 
 //-----------------------------------------------------------------------------
+//                        Extended Data Services (XDS)
+//-----------------------------------------------------------------------------
+
+// XDS packets are carried on field 2 between the caption data. A first byte of
+// 0x01-0x0E starts or continues a packet (odd = Start, even = Continue; the pair
+// selects the class), the data pairs that follow are plain 0x20-0x7F bytes, and
+// 0x0F ends the packet with a checksum. Any caption control code (first byte
+// 0x10-0x1F) interrupts the packet and returns to captioning.
+#define XDS_CTRL_FIRST                                                   0x01
+#define XDS_CTRL_END                                                     0x0F
+
+//-----------------------------------------------------------------------------
 //
 //                              Control Codes
 //

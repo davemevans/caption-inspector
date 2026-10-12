@@ -161,6 +161,7 @@ typedef struct {
     uint8 foundText;
     uint8 decodeWhichChannels;
     uint8 currentChannel[LINE21_NUMBER_OF_FIELDS+1];
+    boolean inXds[LINE21_NUMBER_OF_FIELDS+1];
     uint16 lastPair[LINE21_NUMBER_OF_FIELDS+1];
     boolean dataFound[LINE21_MAX_NUM_CHANNELS+1];
     boolean isPopOnCaptioning[LINE21_MAX_NUM_CHANNELS+1];
@@ -229,6 +230,7 @@ typedef struct {
     FILE* fp;
     boolean wasHeaderWritten;
     uint8 currentChannel[LINE21_NUMBER_OF_FIELDS];
+    boolean inXds[LINE21_NUMBER_OF_FIELDS];
     uint16 last608Pair[LINE21_NUMBER_OF_FIELDS];
     uint8 currentService;
     uint16 cea708ErrNum;

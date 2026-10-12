@@ -23,6 +23,8 @@ static void initCtx( Line21DecodeCtx* ctxPtr ) {
     ctxPtr->foundText = TEXT_REPORTED;
     ctxPtr->currentChannel[CEA608E_LINE21_FIELD_1_CC] = LINE21_CHANNEL_1;
     ctxPtr->currentChannel[CEA608E_LINE21_FIELD_2_CC] = LINE21_CHANNEL_3;
+    ctxPtr->inXds[CEA608E_LINE21_FIELD_1_CC] = FALSE;
+    ctxPtr->inXds[CEA608E_LINE21_FIELD_2_CC] = FALSE;
     ctxPtr->lastPair[CEA608E_LINE21_FIELD_1_CC] = 0;
     ctxPtr->lastPair[CEA608E_LINE21_FIELD_2_CC] = 0;
     for( int loop = 0; loop <= LINE21_MAX_NUM_CHANNELS; loop++ ) {
@@ -202,6 +204,42 @@ void utest__controlCodes( TEST_SUITE_RECEIVED_ARGUMENTS ) {
 }  // utest__controlCodes()
 
 /*------------------------------------------------------------------------------
+ | FUNCTION UNDER TEST: isXdsPair()
+ |
+ | TEST CASES:
+ |     1) A complete field 2 XDS packet (start, data, end) is all XDS, and the
+ |        caption text after it is not.
+ |     2) A caption control code interrupts an XDS packet.
+ |     3) 0x01-0x0F first bytes on field 1 are not XDS.
+ -------------------------------------------------------------------------------*/
+void utest__xds( TEST_SUITE_RECEIVED_ARGUMENTS ) {
+    TEST_INITIALIZE
+    Line21DecodeCtx ctx;
+
+    TEST_START("Test Case: isXdsPair() - A complete XDS packet is skipped, captions after it are not.");
+    initCtx(&ctx);
+    ASSERT_EQ(TRUE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x01));   // Current Class Start
+    ASSERT_EQ(TRUE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x41));   // data
+    ASSERT_EQ(TRUE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x0F));   // End / checksum
+    ASSERT_EQ(FALSE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x41));  // caption text again
+    TEST_END
+
+    TEST_START("Test Case: isXdsPair() - A caption control code interrupts an XDS packet.");
+    initCtx(&ctx);
+    ASSERT_EQ(TRUE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x05));   // Channel Class Start
+    ASSERT_EQ(TRUE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x20));   // data
+    ASSERT_EQ(FALSE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x15));  // CC3 control code
+    ASSERT_EQ(FALSE, ctx.inXds[CEA608E_LINE21_FIELD_2_CC]);
+    ASSERT_EQ(FALSE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x41));
+    TEST_END
+
+    TEST_START("Test Case: isXdsPair() - Field 1 never carries XDS.");
+    initCtx(&ctx);
+    ASSERT_EQ(FALSE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x01));
+    TEST_END
+}  // utest__xds()
+
+/*------------------------------------------------------------------------------
  | FUNCTION UNDER TEST: isRedundantPair()
  |
  | TEST CASES:
@@ -250,6 +288,10 @@ int main( int argc, char* argv[] ) {
 
     TEST_SUITE_START("Test Suite: line21_decode.c -- Control Codes");
     utest__controlCodes( &tmpNumSuccessfulTests, &tmpNumFailedTests );
+    TEST_SUITE_END
+
+    TEST_SUITE_START("Test Suite: line21_decode.c -- Extended Data Services");
+    utest__xds( &tmpNumSuccessfulTests, &tmpNumFailedTests );
     TEST_SUITE_END
 
     TEST_SUITE_START("Test Suite: line21_decode.c -- Redundant Pairs");
