@@ -12,7 +12,7 @@ Decoded Line 21 / CEA-608 for Asset: ./tmp/BigBuckBunny_256x144-24fps-C3 - Chann
 00:00:03,503 - {EDM}
 00:00:03,545 - {EOC}
 00:00:03,586 - {EOC}
-00:00:03,628 - {RCL} {R13:C12} {R13:C12} {TO1} "YO" {R14:C12} {R14:C12} {TO1} "GANO," {R15:C4} {TO3} {TO3} "NOS DAMOS AL" {R13:Green} "."
+00:00:03,628 - {RCL} {R13:C12} {R13:C12} {TO1} "YO" {R14:C12} {R14:C12} {TO1} "GANO," {R15:C4} {TO3} {TO3} "NOS DAMOS ALÍ."
 00:00:05,880 - {RCL}
 00:00:05,922 - {RCL}
 00:00:05,964 - {EDM}
@@ -45,7 +45,7 @@ Decoded Line 21 / CEA-608 for Asset: ./tmp/BigBuckBunny_256x144-24fps-C3 - Chann
 00:00:15,306 - {EDM}
 00:00:15,348 - {EOC}
 00:00:15,390 - {EOC}
-00:00:15,432 - {RCL} {R13:C4} {R13:C4} {TO1} {TO1} {R2:C4:UL} {R2:C4:UL} "CO" {R4:Green} " PODRI" {R13:Green} {R14:C4} {R14:C4} {TO1} {TO1} "CHAZAR U" {R15:C8} {R15:C8} {TO1} {TO1} "ORTUNIDADE"
+00:00:15,432 - {RCL} {R13:C4} {R13:C4} {TO1} {TO1} "¿COÓ PODRIÍ" {R14:C4} {R14:C4} {TO1} {TO1} "CHAZAR U" {R15:C8} {R15:C8} {TO1} {TO1} "ORTUNIDADE"
 00:00:17,350 - {RCL}
 00:00:17,392 - {RCL}
 00:00:17,434 - {EDM}
@@ -73,7 +73,7 @@ Decoded Line 21 / CEA-608 for Asset: ./tmp/BigBuckBunny_256x144-24fps-C3 - Chann
 00:00:22,147 - {EOC}
 00:00:22,188 - {EOC}
 00:00:22,230 - {RCL}
-00:00:22,272 - {RCL} {R14:C4} "-" {R2:C4:UL} {R2:C4:UL} " UNA TOR DE" {R15:C4} {R15:C4} "FRES?"
+00:00:22,272 - {RCL} {R14:C4} "-¿ UNA TOR DE" {R15:C4} {R15:C4} "FRES?"
 00:00:24,482 - {RCL}
 00:00:24,524 - {RCL}
 00:00:24,566 - {EDM}
