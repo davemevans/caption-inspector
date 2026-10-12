@@ -35,6 +35,12 @@ Text
 The text is merely wrapped in quotes, with all whitespaces preserved inside of the quotes. If there are quotes in
 the text, they will be printed out directly and will not be escaped out.
 
+Special Characters (e.g. `♪`, `®`, and the transparent space shown as `☐`) and Extended Characters (e.g. `Á`, `ß`, `—`)
+are printed inside the quotes with the rest of the text. An Extended Character is sent after a fallback character
+that a decoder without the extended set would show, and replaces it, so `"AÁ"` is displayed as `Á`. Like control
+codes, these characters are usually sent twice in a row; the repeated copy is ignored by a decoder, so it is left out
+of the text (a third copy is a new character).
+
 
 Inline Representation of Global Control Codes
 ---------------------------------------------
@@ -63,6 +69,11 @@ text is either Underlined, Partially Transparent, or both.
 
 ![Midrow](./html/assets/content-images/608MidRow.png)
 
+In practice a background code only carries the Partial Transparency flag and a foreground code only carries the
+Underline flag, so the output is e.g. `{BG-Red:PT}` or `{FG-White:UL}`. The attribute codes sent with the Tab Offset
+prefix are shown the same way: Background Transparent as `{BG-Transparent}`, and Foreground Black as `{FG-Black}` or
+`{FG-Black:UL}`.
+
 Inline Representation of Tab Control Codes
 ------------------------------------------
 
@@ -71,4 +82,8 @@ the current position. Used in conjunction with the Column Number from the Addres
 be placed anywhere in the text field.
 
 ![Tab Offset](./html/assets/content-images/608TabOffset.png)
+
+The same first byte also carries the optional character set selection codes (CEA-608-E Table 4), which are shown as
+`{CS-Std}`, `{CS-Dbl}`, `{CS-Priv1}`, `{CS-Priv2}`, `{CS-GB}`, `{CS-KSC}` and `{CS-Reg1}`. They are not meant for
+North American captioning, so seeing one usually means the stream was authored for another market.
 

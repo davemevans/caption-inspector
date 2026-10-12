@@ -34,6 +34,7 @@
 /*--                     Private Member Declarations                        --*/
 /*----------------------------------------------------------------------------*/
 
+static boolean isRedundantPair( Line21DecodeCtx*, uint8, uint8, uint8 );
 static boolean decodeCaptionData( Line21DecodeCtx*, uint8, uint8, Line21Code*, CaptionTime* );
 static boolean decodeGlobalCmd( Line21DecodeCtx*, uint8, uint8, Line21Code*, CaptionTime* );
 static boolean decodeMidRowCode( Line21DecodeCtx*, uint8, uint8, Line21Code* );
@@ -75,6 +76,8 @@ LinkInfo Line21DecodeInitialize( Context* rootCtxPtr, boolean processOnly ) {
     ctxPtr->foundText = NO_TEXT_FOUND;
     ctxPtr->currentChannel[CEA608E_LINE21_FIELD_1_CC] = LINE21_CHANNEL_UNKONWN;
     ctxPtr->currentChannel[CEA608E_LINE21_FIELD_2_CC] = LINE21_CHANNEL_UNKONWN;
+    ctxPtr->lastPair[CEA608E_LINE21_FIELD_1_CC] = 0;
+    ctxPtr->lastPair[CEA608E_LINE21_FIELD_2_CC] = 0;
     for( int loop = 0; loop <= LINE21_MAX_NUM_CHANNELS; loop++ ) {
         ctxPtr->dataFound[loop] = FALSE;
         ctxPtr->isPopOnCaptioning[loop] = FALSE;
@@ -173,6 +176,14 @@ uint8 Line21DecodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
     outBuffer->numElements = 0;
 
     for( int loop = 0; loop < inBuffer->numElements; loop = loop + 3 ) {
+        boolean isRepeat = FALSE;
+        if( (((inBuffer->dataPtr[loop] & CC_CONSTR_CC_TYPE_MASK) == CEA608E_LINE21_FIELD_1_CC) ||
+             ((inBuffer->dataPtr[loop] & CC_CONSTR_CC_TYPE_MASK) == CEA608E_LINE21_FIELD_2_CC)) &&
+            (inBuffer->dataPtr[loop] & CC_CONSTR_CC_VALID_FLAG_MASK) == CC_CONSTR_CC_VALID_FLAG_SET ) {
+            isRepeat = isRedundantPair(ctxPtr, inBuffer->dataPtr[loop] & CC_CONSTR_CC_TYPE_MASK,
+                                       inBuffer->dataPtr[loop+1], inBuffer->dataPtr[loop+2]);
+        }
+
         if( (((inBuffer->dataPtr[loop+1] & LINE_21_PARITY_MASK) != NULL_CAPTION_DATA) ||
              ((inBuffer->dataPtr[loop+2] & LINE_21_PARITY_MASK) != NULL_CAPTION_DATA)) &&
             (((inBuffer->dataPtr[loop] & CC_CONSTR_CC_TYPE_MASK) == CEA608E_LINE21_FIELD_1_CC) ||
@@ -189,7 +200,13 @@ uint8 Line21DecodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
 
             boolean wasDecoded = decodeCaptionData(ctxPtr, inBuffer->dataPtr[loop+1], inBuffer->dataPtr[loop+2], codePtr, &inBuffer->captionTime);
 
-            if( wasDecoded == TRUE ) {
+            if( (wasDecoded == TRUE) && (isRepeat == TRUE) &&
+                ((codePtr->codeType == LINE21_SPECIAL_CHAR) || (codePtr->codeType == LINE21_EXTENDED_CHAR)) ) {
+                // Control codes are output both times, as sent, but a repeated character would
+                // read as two glyphs in the text where a decoder displays one.
+                LOG(DEBUG_LEVEL_VERBOSE, DBG_608_DEC, "Dropping redundant character pair: 0x%02X 0x%02X",
+                    inBuffer->dataPtr[loop+1], inBuffer->dataPtr[loop+2]);
+            } else if( wasDecoded == TRUE ) {
                 outBuffer->numElements = outBuffer->numElements + 1;
                 codePtr++;
             } else {
@@ -360,6 +377,22 @@ uint8 Line21PacDecodeRow( uint8 ccData1, uint8 ccData2 ) {
 
 /*------------------------------------------------------------------------------
  | NAME:
+ |    isRedundantPair()
+ |
+ | DESCRIPTION:
+ |    Two-byte codes are sent twice and a decoder ignores the second copy. This
+ |    function remembers the last pair on each field and returns TRUE when the
+ |    pair repeats it. A NULL pair in between, or a third copy, is a new code.
+ -------------------------------------------------------------------------------*/
+static boolean isRedundantPair( Line21DecodeCtx* ctxPtr, uint8 fieldNum, uint8 byte1, uint8 byte2 ) {
+    uint16 pair = ((byte1 & LINE_21_PARITY_MASK) << 8) | (byte2 & LINE_21_PARITY_MASK);
+    boolean isRepeat = (pair != 0) && (pair == ctxPtr->lastPair[fieldNum]);
+    ctxPtr->lastPair[fieldNum] = (isRepeat == TRUE) ? 0 : pair;
+    return isRepeat;
+}  // isRedundantPair()
+
+/*------------------------------------------------------------------------------
+ | NAME:
  |    decodeCaptionData()
  |
  | DESCRIPTION:
@@ -371,12 +404,15 @@ static boolean decodeCaptionData( Line21DecodeCtx* ctxPtr, uint8 firstByte, uint
     firstByte = firstByte & LINE_21_PARITY_MASK;
     secondByte = secondByte & LINE_21_PARITY_MASK;
 
+    // Each decoder checks both bytes against its exact range. PACs are tried
+    // after the other control codes and characters because they share the
+    // same first bytes (0x10-0x1F) and are distinguished only by the second.
     wasDecoded = decodeGlobalCmd(ctxPtr, firstByte, secondByte, codePtr, captionTimePtr);
     if (wasDecoded == FALSE) wasDecoded = decodeMidRowCode(ctxPtr, firstByte, secondByte, codePtr);
     if (wasDecoded == FALSE) wasDecoded = decodeTabCtrl(ctxPtr, firstByte, secondByte, codePtr);
-    if (wasDecoded == FALSE) wasDecoded = decodePAC(ctxPtr, firstByte, secondByte, codePtr);
     if (wasDecoded == FALSE) wasDecoded = decodeSpecialChar(ctxPtr, firstByte, secondByte, codePtr, captionTimePtr);
     if (wasDecoded == FALSE) wasDecoded = decodeExtendedChar(ctxPtr, firstByte, secondByte, codePtr, captionTimePtr);
+    if (wasDecoded == FALSE) wasDecoded = decodePAC(ctxPtr, firstByte, secondByte, codePtr);
     if (wasDecoded == FALSE) wasDecoded = decodeBasicChars(ctxPtr, firstByte, secondByte, codePtr, captionTimePtr);
 
     return wasDecoded;
@@ -397,7 +433,7 @@ static boolean decodeGlobalCmd( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 cc
         return FALSE;
     }
     
-    if( (ccData2 & GLOBAL_CTRL_CMD_MASK) != ccData2 ) {
+    if( ((ccData2 & GLOBAL_CTRL_CMD_MASK) != ccData2) || (ccData2 < GLOBAL_CTRL_CMD_NORMALIZATION) ) {
         return FALSE;
     }
     
@@ -509,13 +545,15 @@ static boolean decodeGlobalCmd( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 cc
  |    This function decodes the Line 21 Mid-Row Code per the CEA-608 Spec.
  -------------------------------------------------------------------------------*/
 static boolean decodeMidRowCode( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 ccData2, Line21Code* codePtr ) {
+    boolean isAttributeCode = FALSE;
 
-    if( (ccData1 != CMD_MIDROW_BG_CHAN_1_3) && (ccData1 != CMD_MIDROW_FG_CHAN_1_3) &&
-       (ccData1 != CMD_MIDROW_BG_CHAN_2_4) && (ccData1 != CMD_MIDROW_FG_CHAN_2_4) ) {
+    if( ((ccData1 == CMD_TAB_HI_CC_1_3) || (ccData1 == CMD_TAB_HI_CC_2_4)) &&
+        ((ccData2 == CMD_BG_TRANSPARENT) || (ccData2 == CMD_FG_BLACK) || (ccData2 == CMD_FG_BLACK_UNDERLINE)) ) {
+        isAttributeCode = TRUE;
+    } else if( (ccData1 != CMD_MIDROW_BG_CHAN_1_3) && (ccData1 != CMD_MIDROW_FG_CHAN_1_3) &&
+               (ccData1 != CMD_MIDROW_BG_CHAN_2_4) && (ccData1 != CMD_MIDROW_FG_CHAN_2_4) ) {
         return FALSE;
-    }
-    
-    if( (ccData2 & MIDROW_CODE_MASK) != ccData2 ) {
+    } else if( (ccData2 < MIDROW_CODE_FIRST) || (ccData2 > MIDROW_CODE_LAST) ) {
         return FALSE;
     }
     
@@ -523,6 +561,7 @@ static boolean decodeMidRowCode( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 c
     codePtr->codeType = LINE21_MID_ROW_CONTROL_CODE;
     
     switch( ccData1 ) {
+        case CMD_TAB_HI_CC_1_3:
         case CMD_MIDROW_BG_CHAN_1_3:
         case CMD_MIDROW_FG_CHAN_1_3:
             codePtr->code.midRow.chan = LINE21_CHANNEL_1_3;
@@ -534,6 +573,7 @@ static boolean decodeMidRowCode( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 c
                 ctxPtr->currentChannel[codePtr->fieldNum] = LINE21_CHANNEL_3;
             }
             break;
+        case CMD_TAB_HI_CC_2_4:
         case CMD_MIDROW_BG_CHAN_2_4:
         case CMD_MIDROW_FG_CHAN_2_4:
             codePtr->code.midRow.chan = LINE21_CHANNEL_2_4;
@@ -551,13 +591,26 @@ static boolean decodeMidRowCode( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 c
             break;
     }
     
-    if( (ccData1 & MIDROW_BG_FG_MASK) == MIDROW_FOREGROUND_STYLE ) {
+    // Foreground codes carry an underline flag in bit 0; background codes
+    // carry a semi-transparency flag in the same bit.
+    codePtr->code.midRow.isPartiallyTransparent = FALSE;
+    codePtr->code.midRow.isUnderlined = FALSE;
+    if( isAttributeCode == TRUE ) {
+        if( ccData2 == CMD_BG_TRANSPARENT ) {
+            codePtr->code.midRow.backgroundOrForeground = MIDROW_BACKGROUND_COLOR;
+            codePtr->code.midRow.backgroundForgroundData.color = MIDROW_BG_COLOR_TRANSPARENT;
+        } else {
+            codePtr->code.midRow.backgroundOrForeground = MIDROW_FOREGROUND_STYLE;
+            codePtr->code.midRow.backgroundForgroundData.style = MIDROW_FG_STYLE_BLACK;
+            codePtr->code.midRow.isUnderlined = (ccData2 == CMD_FG_BLACK_UNDERLINE);
+        }
+    } else if( (ccData1 & MIDROW_BG_FG_MASK) == MIDROW_FOREGROUND_STYLE ) {
         codePtr->code.midRow.backgroundOrForeground = MIDROW_FOREGROUND_STYLE;
-        codePtr->code.midRow.isPartiallyTransparent = ccData2 & MIDROW_TRANSPARENCY_MASK;
+        codePtr->code.midRow.isUnderlined = ccData2 & MIDROW_UNDERLINE_MASK;
         codePtr->code.midRow.backgroundForgroundData.style = ccData2 & MIDROW_FG_STYLE_MASK;
     } else {
         codePtr->code.midRow.backgroundOrForeground = MIDROW_BACKGROUND_COLOR;
-        codePtr->code.midRow.isUnderlined = ccData2 & MIDROW_UNDERLINE_MASK;
+        codePtr->code.midRow.isPartiallyTransparent = ccData2 & MIDROW_TRANSPARENCY_MASK;
         codePtr->code.midRow.backgroundForgroundData.color = ccData2 & MIDROW_BG_COLOR_MASK;
     }
     
@@ -577,7 +630,8 @@ static boolean decodeTabCtrl( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 ccDa
         return FALSE;
     }
     
-    if( (ccData2 & TAB_CMD_MASK) != ccData2 ) {
+    if( ((ccData2 < TAB_CMD_TO1) || (ccData2 > TAB_CMD_TO3)) &&
+        ((ccData2 < CHARSET_CMD_FIRST) || (ccData2 > CHARSET_CMD_LAST)) ) {
         return FALSE;
     }
     
@@ -625,7 +679,12 @@ static boolean decodeTabCtrl( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 ccDa
  -------------------------------------------------------------------------------*/
 static boolean decodePAC( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 ccData2, Line21Code* codePtr ) {
     
-    if( (ccData1 & PAC_CC1_MASK) != ccData1 ) {
+    if( (ccData1 < PAC_FIRST_BYTE_FIRST) || (ccData1 > PAC_FIRST_BYTE_LAST) ||
+        (ccData2 < PAC_SECOND_BYTE_FIRST) || (ccData2 > PAC_SECOND_BYTE_LAST) ) {
+        return FALSE;
+    }
+
+    if( ((ccData1 & ~PAC_CHANNEL_MASK) == PAC_FIRST_BYTE_FIRST) && (ccData2 > PAC_ROW_11_SECOND_BYTE_LAST) ) {
         return FALSE;
     }
     
@@ -724,7 +783,7 @@ static boolean decodeSpecialChar( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 
         return FALSE;
     }
     
-    if( (ccData2 & SPCL_NA_CHAR_SET_MASK) != ccData2 ) {
+    if( (ccData2 < SPCL_NA_CHAR_FIRST) || (ccData2 > SPCL_NA_CHAR_LAST) ) {
         return FALSE;
     }
     
@@ -758,7 +817,7 @@ static boolean decodeSpecialChar( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 
             break;
     }
     
-    codePtr->code.specialChar.spChar = ccData2 & SPCL_NA_CHAR_MASK;
+    codePtr->code.specialChar.spChar = ccData2;
 
     if( ctxPtr->foundText == NO_TEXT_FOUND ) {
         ctxPtr->foundText = TEXT_FOUND;
@@ -784,19 +843,23 @@ static boolean decodeExtendedChar( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8
         return FALSE;
     }
     
-    if( (ccData2 & EXT_W_EURO_CHAR_SET_MASK) != ccData2 ) {
+    if( (ccData2 < EXT_W_EURO_CHAR_FIRST) || (ccData2 > EXT_W_EURO_CHAR_LAST) ) {
         return FALSE;
     }
     
     ASSERT(codePtr);
     codePtr->codeType = LINE21_EXTENDED_CHAR;
+    codePtr->code.extendedChar.exChar = ccData2;
+    if( (ccData1 & EXT_W_EURO_CHAR_SET_SELECT_MASK) == 0 ) {
+        codePtr->code.extendedChar.charSet = EXT_W_EURO_CHAR_SET_SPANISH_FRENCH;
+    } else {
+        codePtr->code.extendedChar.charSet = EXT_W_EURO_CHAR_SET_DUTCH_GERMAN;
+    }
     
     switch( ccData1 ) {
         case EXT_W_EURO_CHAR_SET_CH_1_3_SF:
         case EXT_W_EURO_CHAR_SET_CH_1_3_FG:
             codePtr->code.extendedChar.chan = LINE21_CHANNEL_1_3;
-            codePtr->code.extendedChar.charSet = EXT_W_EURO_CHAR_SET_SPANISH_FRENCH;
-            codePtr->code.extendedChar.exChar = ccData2;
             if( codePtr->fieldNum == CEA608E_LINE21_FIELD_1_CC ) {
                 codePtr->channelNum = LINE21_CHANNEL_1;
                 ctxPtr->currentChannel[codePtr->fieldNum] = LINE21_CHANNEL_1;
@@ -808,8 +871,6 @@ static boolean decodeExtendedChar( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8
         case EXT_W_EURO_CHAR_SET_CH_2_4_SF:
         case EXT_W_EURO_CHAR_SET_CH_2_4_FG:
             codePtr->code.extendedChar.chan = LINE21_CHANNEL_2_4;
-            codePtr->code.extendedChar.charSet = EXT_W_EURO_CHAR_SET_DUTCH_GERMAN;
-            codePtr->code.extendedChar.exChar = ccData2;
             if( codePtr->fieldNum == CEA608E_LINE21_FIELD_1_CC ) {
                 codePtr->channelNum = LINE21_CHANNEL_2;
                 ctxPtr->currentChannel[codePtr->fieldNum] = LINE21_CHANNEL_2;

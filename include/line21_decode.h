@@ -155,6 +155,8 @@
 
 #define SPCL_NA_CHAR_MASK                                                0x0F
 #define SPCL_NA_CHAR_SET_MASK                                            0x3F
+#define SPCL_NA_CHAR_FIRST                                               0x30
+#define SPCL_NA_CHAR_LAST                                                0x3F
 
 //-----------------------------------------------------------------------------
 //                           Extended Characters
@@ -171,10 +173,10 @@
 //                      |P|0|0|1|  |C|0|1|S|       |P|0|1| CHARCTR |
 //                      +-+-+-+-+  +-+-+-+-+       +-+-+-+-+-+-+-+-+
 //                   15     12  11      8          7               0
-// Chan 1/3     0x12 -   0 0 0 1    0 0 1 0         0 0 1 X X X X X  (Sp/Gr/Du)
-// Chan 1/3     0x13 -   0 0 0 1    0 0 1 1         0 0 1 X X X X X  (Fr/Prtgs)
-// Chan 2/4     0x1A -   0 0 0 1    1 0 1 0         0 0 1 X X X X X  (Sp/Gr/Du)
-// Chan 2/4     0x1B -   0 0 0 1    1 0 1 1         0 0 1 X X X X X  (Fr/Prtgs)
+// Chan 1/3     0x12 -   0 0 0 1    0 0 1 0         0 0 1 X X X X X  (Sp/Misc/Fr)
+// Chan 1/3     0x13 -   0 0 0 1    0 0 1 1         0 0 1 X X X X X  (Pt/Gr/Da)
+// Chan 2/4     0x1A -   0 0 0 1    1 0 1 0         0 0 1 X X X X X  (Sp/Misc/Fr)
+// Chan 2/4     0x1B -   0 0 0 1    1 0 1 1         0 0 1 X X X X X  (Pt/Gr/Da)
 //
 //   Spanish/Misc.          French            Portuguese        German/Danish
 // +--------------+    +--------------+    +--------------+    +--------------+
@@ -192,25 +194,25 @@
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
 // | 0x25 |  'ü'  |    | 0x35 |  'Ë'  |    | 0x25 |  'Ò'  |    | 0x35 |  '¥'  |
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
-// | 0x26 |  '´'  |    | 0x36 |  'ë'  |    | 0x26 |  'ò'  |    | 0x36 |  '¤'  |
+// | 0x26 |  '‘'  |    | 0x36 |  'ë'  |    | 0x26 |  'ò'  |    | 0x36 |  '¤'  |
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
-// | 0x27 |  '¡'  |    | 0x37 |  'Î'  |    | 0x27 |  'Õ'  |    | 0x37 |  '¦'  |
+// | 0x27 |  '¡'  |    | 0x37 |  'Î'  |    | 0x27 |  'Õ'  |    | 0x37 |  '│'  |
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
 // | 0x28 |  '*'  |    | 0x38 |  'Ï'  |    | 0x28 |  'õ'  |    | 0x38 |  'Å'  |
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
-// | 0x29 |  '''  |    | 0x39 |  'ï'  |    | 0x29 |  '{'  |    | 0x39 |  'å'  |
+// | 0x29 |  '’'  |    | 0x39 |  'ï'  |    | 0x29 |  '{'  |    | 0x39 |  'å'  |
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
-// | 0x2A |  '-'  |    | 0x3A |  'Ô'  |    | 0x2A |  '}'  |    | 0x3A |  'Ø'  |
+// | 0x2A |  '—'  |    | 0x3A |  'Ô'  |    | 0x2A |  '}'  |    | 0x3A |  'Ø'  |
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
 // | 0x2B |  '©'  |    | 0x3B |  'Ù'  |    | 0x2B |  '\'  |    | 0x3B |  'ø'  |
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
-// | 0x2C |  '℠'  |    | 0x3C |  'ù'  |    | 0x2C |  '^'  |    | 0x3C |  '+'  |
+// | 0x2C |  '℠'  |    | 0x3C |  'ù'  |    | 0x2C |  '^'  |    | 0x3C |  '┌'  |
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
-// | 0x2D |  '·'  |    | 0x3D |  'Û'  |    | 0x2D |  '_'  |    | 0x3D |  '+'  |
+// | 0x2D |  '•'  |    | 0x3D |  'Û'  |    | 0x2D |  '_'  |    | 0x3D |  '┐'  |
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
-// | 0x2E |  '"'  |    | 0x3E |  '«'  |    | 0x2E |  '|'  |    | 0x3E |  '+'  |
+// | 0x2E |  '“'  |    | 0x3E |  '«'  |    | 0x2E |  '|'  |    | 0x3E |  '└'  |
 // +------+-------+    +------+-------+    +------+-------+    +------+-------+
-// | 0x2F |  '"'  |    | 0x3F |  '»'  |    | 0x2F |  '~'  |    | 0x3F |  '+'  |
+// | 0x2F |  '”'  |    | 0x3F |  '»'  |    | 0x2F |  '~'  |    | 0x3F |  '┘'  |
 // +--------------+    +--------------+    +--------------+    +--------------+
 #define EXT_W_EURO_CHAR_SET_CH_1_3_SF                                    0x12
 #define EXT_W_EURO_CHAR_SET_CH_1_3_FG                                    0x13
@@ -224,6 +226,9 @@
 #define EXT_W_EURO_CHAR_SET_MASK                                         0x3F
 
 #define EXT_W_EURO_CHAR_SET_TOGGLE_MASK                                  0x10
+#define EXT_W_EURO_CHAR_SET_SELECT_MASK                                  0x01
+#define EXT_W_EURO_CHAR_FIRST                                            0x20
+#define EXT_W_EURO_CHAR_LAST                                             0x3F
 
 //-----------------------------------------------------------------------------
 //
@@ -376,6 +381,12 @@
 // (Next Row / Addrs)        0 0 0 1    1 X X X    0x7X -  0 1 1 1    X X X X
 // Max Chan 2/4 Std   0x1F - 0 0 0 1    1 1 1 1    0x7F -  0 1 1 1    1 1 1 1
 #define PAC_CC1_MASK                                                       0x1F
+#define PAC_FIRST_BYTE_FIRST                                               0x10
+#define PAC_FIRST_BYTE_LAST                                                0x1F
+#define PAC_SECOND_BYTE_FIRST                                              0x40
+#define PAC_SECOND_BYTE_LAST                                               0x7F
+// Row 11 (first byte 0x10 / 0x18) only has PACs with second bytes 0x40-0x5F.
+#define PAC_ROW_11_SECOND_BYTE_LAST                                        0x5F
 
 #define PAC_CHANNEL_MASK                                                   0x08
 #define PAC_CHANNEL_1_3                                                    0x00
@@ -469,9 +480,40 @@
 #define TAB_CMD_TO2                                                        0x22
 #define TAB_CMD_TO3                                                        0x23
 
+// The same first byte also carries the Table 4 "Special Assignments" that select a
+// character set (CEA-608-E 6.3). They are not for the North American market.
+// +-----------------------------------------------------------------------------+
+// | CMD      |  Meaning                                         |     Code      |
+// +----------+--------------------------------------------------+---------------+
+// | CS-Std   |  Standard line 21 character set, normal size     |     0x24      |
+// | CS-Dbl   |  Standard line 21 character set, double size     |     0x25      |
+// | CS-Priv1 |  First private character set                     |     0x26      |
+// | CS-Priv2 |  Second private character set                    |     0x27      |
+// | CS-GB    |  People's Republic of China set: GB 2312-80      |     0x28      |
+// | CS-KSC   |  Korean Standard set: KSC 5601-1987              |     0x29      |
+// | CS-Reg1  |  First registered character set                  |     0x2A      |
+// +-----------------------------------------------------------------------------+
+#define CHARSET_CMD_FIRST                                                  0x24
+#define CHARSET_CMD_LAST                                                   0x2A
+
 #define TAB_CMD_UNKNOWN                                                    0x20
 #define TAB_CMD_MASK                                                       0x23
 #define TOC_COLUMN_MASK                                                    0x03
+
+// The same first byte (0x17 / 0x1F) also carries three attribute codes that
+// behave like Mid-Row Codes (they apply from the current cursor position):
+// +-----------------------------------------------------------------------------+
+// | CMD |       Full Name       |           Meaning          |       Code       |
+// +-----+-----------------------+----------------------------+------------------+
+// | BT  | Background Transparent| No box behind the text.    | 0x2D - 0010 1101 |
+// +-----+-----------------------+----------------------------+------------------+
+// | FA  | Foreground Black      | Black text.                | 0x2E - 0010 1110 |
+// +-----+-----------------------+----------------------------+------------------+
+// | FAU | Foreground Black UL   | Black underlined text.     | 0x2F - 0010 1111 |
+// +-----------------------------------------------------------------------------+
+#define CMD_BG_TRANSPARENT                                                 0x2D
+#define CMD_FG_BLACK                                                       0x2E
+#define CMD_FG_BLACK_UNDERLINE                                             0x2F
 
 //-----------------------------------------------------------------------------
 //                             Mid-Row Control Codes
@@ -501,6 +543,8 @@
 #define CMD_MIDROW_FG_CHAN_2_4                                             0x19
 
 #define MIDROW_CODE_MASK                                                   0x2F
+#define MIDROW_CODE_FIRST                                                  0x20
+#define MIDROW_CODE_LAST                                                   0x2F
 
 #define MIDROW_TRANSPARENCY_MASK                                           0x01
 #define MIDROW_COMPLETELY_OPAQUE                                           0x00
@@ -523,6 +567,7 @@
 #define MIDROW_BG_COLOR_MAGENTA                                            0x0C
 #define MIDROW_BG_COLOR_BLACK                                              0x0E
 
+#define MIDROW_BG_COLOR_TRANSPARENT                                        0x10  // 0x17 0x2D only
 #define MIDROW_BG_COLOR_UNKNOWN                                            0x0F
 #define MIDROW_BG_COLOR_MASK                                               0x0E
 
@@ -535,6 +580,7 @@
 #define MIDROW_FG_STYLE_MAGENTA                                            0x0C
 #define MIDROW_FG_STYLE_ITALIC_WHITE                                       0x0E
 
+#define MIDROW_FG_STYLE_BLACK                                              0x10  // 0x17 0x2E/0x2F only
 #define MIDROW_FG_STYLE_UNKNOWN                                            0x0F
 #define MIDROW_FG_STYLE_MASK                                               0x0E
 
