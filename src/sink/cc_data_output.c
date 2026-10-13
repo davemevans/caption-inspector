@@ -1823,13 +1823,13 @@ static void appendText( char* dst, const char* src ) {
  -------------------------------------------------------------------------------*/
 static uint16 add708Error( CcDataOutputCtx* ctxPtr, char* errStr ) {
     ctxPtr->cea708ErrNum = ctxPtr->cea708ErrNum + 1;
-    if( strlen(errStr) == 0 ) {
-        snprintf(errStr, CEA708_ERROR_STR_SIZE + 1, "*** {%X}", ctxPtr->cea708ErrNum );
-    } else {
-        char tmpErrStr[CEA708_ERROR_STR_SIZE];
-        snprintf(tmpErrStr, CEA708_ERROR_STR_SIZE - strlen(errStr) + 1, " {%X}", ctxPtr->cea708ErrNum );
-        strcat(errStr, tmpErrStr);
-// HACK - TODO - Trunkating Errors?
+    // errStr holds CEA708_ERROR_STR_SIZE bytes; references that do not fit are dropped
+    // (the errors themselves are all in the log).
+    size_t len = strlen(errStr);
+    if( len == 0 ) {
+        snprintf(errStr, CEA708_ERROR_STR_SIZE, "*** {%X}", ctxPtr->cea708ErrNum );
+    } else if( len < (CEA708_ERROR_STR_SIZE - 1) ) {
+        snprintf(&errStr[len], CEA708_ERROR_STR_SIZE - len, " {%X}", ctxPtr->cea708ErrNum );
     }
     return ctxPtr->cea708ErrNum;
 }  // add708Error()
