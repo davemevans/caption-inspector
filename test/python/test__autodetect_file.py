@@ -3,6 +3,7 @@
 
 import ctypes
 import os
+import shutil
 import pytest
 
 CAPTION_INSPECTOR_LIBRARY = './libci-test.1.0.0.dylib'
@@ -17,6 +18,9 @@ MOV_BINARY_FILE = 4
 # GPAC. Probe the library so the MOV test skips cleanly on a build without it
 # rather than failing (a .mov is reported as an MPEG file when GPAC is absent).
 MOV_SUPPORTED = ctypes.CDLL(CAPTION_INSPECTOR_LIBRARY).ExtrnlAdptrIsMovSupported() != 0
+
+# Drop Frame detection asks MediaInfo; without it every asset reads as non-Drop Frame.
+HAVE_MEDIAINFO = shutil.which('mediainfo') is not None
 
 
 class TestClass(object):
@@ -56,6 +60,7 @@ class TestClass(object):
         is_drop_frame = clib.DetermineDropFrame("../media/BigBuckBunny_160x90-24fps.mpg".encode('utf-8'), 0, 0)
         assert is_drop_frame == 0
 
+    @pytest.mark.skipif(not HAVE_MEDIAINFO, reason="Drop Frame detection requires MediaInfo on the PATH")
     def test__Determine_DF_IDF(self):
         clib = ctypes.CDLL(CAPTION_INSPECTOR_LIBRARY)
         is_drop_frame = clib.DetermineDropFrame("../media/BigBuckBunny_160x90-24fps.mov".encode('utf-8'), 0, 0)
