@@ -255,6 +255,14 @@ boolean MpegFileInitialize( Context* rootCtxPtr, uint8 bailAfterMins ) {
             LOG(DEBUG_LEVEL_INFO, DBG_MPEG_FILE, "Dropframe forced to FALSE");
         }
     } else {
+        if( (ctxPtr->isDropframe == TRUE) && (ctxPtr->frameRatePerSecTimesOneHundred != 2997) &&
+            (ctxPtr->frameRatePerSecTimesOneHundred != 5994) ) {
+            // Drop-frame timecode only exists at 29.97 and 59.94 (MediaInfo can report it from an
+            // embedded timecode at other rates, e.g. 23.976).
+            LOG(DEBUG_LEVEL_WARN, DBG_MPEG_FILE, "Ignoring Dropframe reported at %d.%02d fps; it only applies to 29.97 and 59.94",
+                ctxPtr->frameRatePerSecTimesOneHundred / 100, ctxPtr->frameRatePerSecTimesOneHundred % 100);
+            ctxPtr->isDropframe = FALSE;
+        }
         if( ctxPtr->isDropframe ) {
             LOG(DEBUG_LEVEL_INFO, DBG_MPEG_FILE, "Dropframe = TRUE");
         } else {
