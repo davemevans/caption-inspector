@@ -708,15 +708,15 @@ static Buffer* addBoilerplate( MccEncodeCtx* ctxPtr, Buffer* inBufferPtr ) {
     dataPtr[5] = inBufferPtr->numElements + 13;
     dataPtr[6] = ((cdpFramerateFromFramerate(inBufferPtr->captionTime.frameRatePerSecTimesOneHundred) << 4) | 0x0F);
     dataPtr[7] = 0x43;  // Timecode not Present; Service Info not Present; Captions Present
-    dataPtr[8] = (uint8)((ctxPtr->cdpHeaderSequence & 0xF0) >> 8);
-    dataPtr[9] = (uint8)(ctxPtr->cdpHeaderSequence & 0x0F);
+    dataPtr[8] = (uint8)(ctxPtr->cdpHeaderSequence >> 8);    // 16-bit, big-endian; wraps at 0xFFFF
+    dataPtr[9] = (uint8)(ctxPtr->cdpHeaderSequence & 0xFF);
     dataPtr[10] = CC_DATA_ID;
     dataPtr[11] = ccCount | 0xE0;
     memcpy( &dataPtr[12], inBufferPtr->dataPtr, inBufferPtr->numElements );
     dataPtr = &dataPtr[(12+inBufferPtr->numElements)];
     dataPtr[0] = CDP_FOOTER_ID;
-    dataPtr[1] = (uint8)((ctxPtr->cdpHeaderSequence & 0xF0) >> 8);
-    dataPtr[2] = (uint8)(ctxPtr->cdpHeaderSequence & 0x0F);
+    dataPtr[1] = (uint8)(ctxPtr->cdpHeaderSequence >> 8);
+    dataPtr[2] = (uint8)(ctxPtr->cdpHeaderSequence & 0xFF);
     dataPtr[3] = 0; // cdp checksum
     dataPtr[4] = 0; // vanc checksum
 
