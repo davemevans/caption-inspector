@@ -83,7 +83,8 @@ boolean MpegFileInitialize( Context* rootCtxPtr, uint8 bailAfterMins ) {
     ctxPtr->packet = NULL;
     ctxPtr->draining = FALSE;
 
-    ctxPtr->firstPts = 0;
+    // 0 is a normal first PTS (e.g. MP4), so "not yet known" is AV_NOPTS_VALUE.
+    ctxPtr->firstPts = AV_NOPTS_VALUE;
     ctxPtr->ccCountMismatchErrors = 0;
 
     ctxPtr->fileSize = 0;
@@ -196,6 +197,9 @@ boolean MpegFileInitialize( Context* rootCtxPtr, uint8 bailAfterMins ) {
 
     stream_index = ret;
     ctxPtr->streamIndex = stream_index;
+    // Time zero is the stream's first presentation time. libavformat takes it from the
+    // earliest PTS, so frames reordered for B-frames never land before it.
+    ctxPtr->firstPts = ctxPtr->formatContext->streams[stream_index]->start_time;
 
     ctxPtr->decoderContext = avcodec_alloc_context3(dec);
     if( ctxPtr->decoderContext == NULL ) {
@@ -352,11 +356,6 @@ uint8 MpegFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
                 return FALSE;
             } else {
                 if( ctxPtr->packet->stream_index == ctxPtr->streamIndex ) {
-                    if( ctxPtr->firstPts == 0 ) {
-                        // Rollover of the 33-bit PTS is handled where the
-                        // per-frame delta is computed, below.
-                        ctxPtr->firstPts = ctxPtr->packet->pts;
-                    }
                     // A packet the decoder rejects (e.g. corrupt data) is skipped; decoding goes on.
                     retval = avcodec_send_packet(ctxPtr->decoderContext, ctxPtr->packet);
                     if( retval < 0 ) {
@@ -383,16 +382,27 @@ uint8 MpegFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
         for( int i = 0; i < ctxPtr->frame->nb_side_data; i++ ) {
             if(ctxPtr->frame->side_data[i]->type == AV_FRAME_DATA_A53_CC) {
                 ctxPtr->frame->pts = ctxPtr->frame->best_effort_timestamp;
+                if( ctxPtr->frame->pts == AV_NOPTS_VALUE ) {
+                    LOG(DEBUG_LEVEL_WARN, DBG_MPEG_FILE, "Captions on a frame without a timestamp, placing them at the start");
+                    ctxPtr->frame->pts = (ctxPtr->firstPts == AV_NOPTS_VALUE) ? 0 : ctxPtr->firstPts;
+                }
+                if( ctxPtr->firstPts == AV_NOPTS_VALUE ) {
+                    // The container did not report a start time: use the first decoded
+                    // frame, which is the first in presentation order.
+                    ctxPtr->firstPts = ctxPtr->frame->pts;
+                }
 
                 // MPEG-TS PTS is a 33-bit value on a 90 kHz clock, so it wraps
                 // every ~26.5 hours. A wrap makes (pts - firstPts) jump hugely
                 // negative; add one wrap period back to keep the timeline
                 // continuous. The half-range threshold ensures we only correct a
-                // real wrap and not the small negative delta that legitimately
-                // occurs from B-frame presentation reordering near the start.
+                // real wrap; any other negative delta (a frame before the reported
+                // start time) is clamped to the start.
                 int64 ptsDelta = ctxPtr->frame->pts - ctxPtr->firstPts;
                 if( ptsDelta < -(1LL << 32) ) {
                     ptsDelta += (1LL << 33);
+                } else if( ptsDelta < 0 ) {
+                    ptsDelta = 0;
                 }
 
                 pts = ((ptsDelta * ctxPtr->formatContext->streams[ctxPtr->streamIndex]->time_base.num)) /
