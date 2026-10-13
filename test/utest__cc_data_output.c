@@ -53,7 +53,7 @@ void utest__decodeServiceBlockHeaderExtension( TEST_SUITE_RECEIVED_ARGUMENTS ) {
     CcDataOutputCtx ctx;
     char tagStr[CC_DATA_ELEMENT_HALF_TAG_STR_SIZE];
     char decStr[CC_DATA_ELEMENT_HALF_DEC_STR_SIZE];
-    char errStr[CEA708_ERROR_STR_SIZE + 1];
+    char errStr[CEA708_ERROR_STR_SIZE];
 
     TEST_START("Test Case: decodeServiceBlockHeaderExtension() - Service 0 is rejected as invalid.");
     ctx.cea708ErrNum = 0;
@@ -115,7 +115,7 @@ void utest__extendedServiceBlockData( TEST_SUITE_RECEIVED_ARGUMENTS ) {
     TextString txtStr;
     char tagStr[CC_DATA_ELEMENT_HALF_TAG_STR_SIZE];
     char decStr[CC_DATA_ELEMENT_HALF_DEC_STR_SIZE];
-    char errStr[CEA708_ERROR_STR_SIZE + 1];
+    char errStr[CEA708_ERROR_STR_SIZE];
 
     TEST_START("Test Case: decodePacketData() - Block data after a Service 0 header is discarded.");
     // Arrange: as though a Service-7 extended block header (2 data bytes) was just
@@ -170,6 +170,38 @@ void utest__extendedServiceBlockData( TEST_SUITE_RECEIVED_ARGUMENTS ) {
 }  // utest__extendedServiceBlockData()
 
 /*------------------------------------------------------------------------------
+ | FUNCTION UNDER TEST: add708Error()
+ |
+ | TEST CASES:
+ |     1) Many errors on one line stay within the CEA708_ERROR_STR_SIZE buffer
+ |        (the bytes after it are untouched) and the string stays terminated.
+ -------------------------------------------------------------------------------*/
+void utest__add708Error( TEST_SUITE_RECEIVED_ARGUMENTS ) {
+    TEST_INITIALIZE
+    CcDataOutputCtx ctx;
+    struct {
+        char errStr[CEA708_ERROR_STR_SIZE];
+        char guard[8];
+    } buf;
+
+    TEST_START("Test Case: add708Error() - Many errors do not overrun the error string.");
+    ctx.cea708ErrNum = 0x100;   // three hex digits per reference fills the buffer quickly
+    buf.errStr[0] = '\0';
+    memset(buf.guard, 0x5A, sizeof(buf.guard));
+    for( int loop = 0; loop < 20; loop++ ) {
+        add708Error(&ctx, buf.errStr);
+    }
+    ASSERT_EQ(TRUE, strlen(buf.errStr) < CEA708_ERROR_STR_SIZE);
+    boolean guardIntact = TRUE;
+    for( int loop = 0; loop < sizeof(buf.guard); loop++ ) {
+        if( buf.guard[loop] != 0x5A ) guardIntact = FALSE;
+    }
+    ASSERT_EQ(TRUE, guardIntact);
+    ASSERT_EQ(0x100 + 20, ctx.cea708ErrNum);
+    TEST_END
+}  // utest__add708Error()
+
+/*------------------------------------------------------------------------------
  | UNTESTED FUNCTIONS:
  |    Most of cc_data_output.c drives file output and is exercised by the
  |    integration/Python pipeline tests; this suite covers the Service Number
@@ -184,6 +216,10 @@ int main( int argc, char* argv[] ) {
 
     TEST_SUITE_START("Test Suite: cc_data_output.c -- Extended Service Block Data");
     utest__extendedServiceBlockData( &tmpNumSuccessfulTests, &tmpNumFailedTests );
+    TEST_SUITE_END
+
+    TEST_SUITE_START("Test Suite: cc_data_output.c -- add708Error()");
+    utest__add708Error( &tmpNumSuccessfulTests, &tmpNumFailedTests );
     TEST_SUITE_END
 
     SHUTDOWN_TEST_FRAMEWORK
