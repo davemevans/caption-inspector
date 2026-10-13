@@ -35,6 +35,8 @@
 /*--                       Public Member Variables                          --*/
 /*----------------------------------------------------------------------------*/
 
+#define SCC_MAX_LINE_CHARS                                 65536
+
 /*----------------------------------------------------------------------------*/
 /*--                      Private Member Variables                          --*/
 /*----------------------------------------------------------------------------*/
@@ -264,6 +266,11 @@ uint8 SccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
                 LOG(DEBUG_LEVEL_WARN, DBG_FILE_IN, "Skipping SCC line without caption data: '%s'", line);
                 free(line);
                 line = NULL;
+            } else if( read > SCC_MAX_LINE_CHARS ) {
+                // the decoded bytes would not fit the buffer's 16-bit size
+                LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Skipping SCC line longer than %d characters: %.20s...", SCC_MAX_LINE_CHARS, line);
+                free(line);
+                line = NULL;
             }
         }
     }
@@ -274,7 +281,8 @@ uint8 SccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
     ASSERT(timecode);
     ASSERT(sccdata);
 
-    size_t size = ((strlen(sccdata) + 1) / 5) * 2;
+    // Each byte takes two hex digits, so this is an upper bound however the words are spaced.
+    size_t size = (strlen(sccdata) / 2) + 1;
     Buffer* newBufferPtr = NewBuffer( BUFFER_TYPE_BYTES, (uint16)size );
     newBufferPtr->numElements = 0;
     newBufferPtr->captionTime.frameRatePerSecTimesOneHundred = ctxPtr->frameRateTimesOneHundred;
@@ -283,6 +291,11 @@ uint8 SccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
 
     char* wordPtr = strtok(sccdata, " ");
     while( wordPtr != NULL ) {
+        if( strlen(wordPtr) != 4 ) {
+            LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Unable to parse SCC Word - %s", wordPtr );
+            wordPtr = strtok(NULL, " ");
+            continue;
+        }
         if( isHexByteValid(wordPtr[0], wordPtr[1]) == TRUE ) {
             newBufferPtr->dataPtr[newBufferPtr->numElements] = byteFromNibbles(wordPtr[0], wordPtr[1]);
             newBufferPtr->numElements++;
