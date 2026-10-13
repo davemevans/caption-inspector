@@ -389,7 +389,7 @@ static Buffer* decodeMccLine( MccDecodeCtx* ctxPtr, Buffer* buffPtr ) {
     tmpPtr = tmpPtr + 7;
     
     if( timeCodeSectionPresent == TRUE ) {
-        if( !bytesRemain(tmpPtr, endPtr, sizeof(time_code_section) - 1) ) {
+        if( !bytesRemain(tmpPtr, endPtr, sizeof(time_code_section)) ) {
             LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Truncated MCC line: not enough bytes for the Time Code Section");
             FreeBuffer(buffPtr);
             return NULL;
@@ -402,7 +402,8 @@ static Buffer* decodeMccLine( MccDecodeCtx* ctxPtr, Buffer* buffPtr ) {
             LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "Invalid Time Code ID: 0x%02X vs 0x%02X", timeCodeSection.time_code_section_id, TIME_CODE_ID);
         }
 
-        tmpPtr = tmpPtr + sizeof(time_code_section) - 1;
+        // The section is 5 bytes: its ID (0x71) and four bytes of time code.
+        tmpPtr = tmpPtr + sizeof(time_code_section);
     }
 
     // ccdata_section header: id(1), cc_count(1).

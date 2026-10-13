@@ -35,6 +35,16 @@ static const uint8 wellFormedPacket[] = {
     0x74, 0x00, 0x00, 0x00, 0x00
 };
 
+// The same packet with a CDP time code section (01:00:00:00) before the CC data.
+//  DID  SDID DC | cdpId  len  fr  flg seq   | tcId <-- time code --> | ccId cc | ...
+//  61   01   15 | 96 69  15   50  C3  00 00 | 71   C1  80  80  00    | 72   E2 | ...
+static const uint8 timeCodePacket[] = {
+    0x61, 0x01, 0x15, 0x96, 0x69, 0x15, 0x50, 0xC3, 0x00, 0x00,
+    0x71, 0xC1, 0x80, 0x80, 0x00,
+    0x72, 0xE2, 0xFF, 0x02, 0x21, 0xFE, 0x03, 0x04,
+    0x74, 0x00, 0x00, 0x00, 0x00
+};
+
 /*----------------------------------------------------------------------------*/
 /*--                             Test Cases                                 --*/
 /*----------------------------------------------------------------------------*/
@@ -48,6 +58,8 @@ static const uint8 wellFormedPacket[] = {
  |        the heap over-read: cc_count*3 bytes were memcpy'd from the buffer).
  |     3) A line too short to even hold the ANC packet header is rejected.
  |     4) A line too short to hold the CDP header is rejected.
+ |     5) A packet with a time code section decodes the CC constructs after it
+ |        (the section is 5 bytes including its ID).
  -------------------------------------------------------------------------------*/
 void utest__decodeMccLineBounds( TEST_SUITE_RECEIVED_ARGUMENTS ) {
     TEST_INITIALIZE
@@ -91,6 +103,19 @@ void utest__decodeMccLineBounds( TEST_SUITE_RECEIVED_ARGUMENTS ) {
     ERROR_EXPECTED
     Buffer* tooShort = decodeMccLine(&ctx, makeMccBuffer(shortHdr, sizeof(shortHdr)));
     ASSERT_PTREQ(NULL, tooShort);
+    TEST_END
+
+    TEST_START("Test Case: decodeMccLine() - The time code section is skipped in full.");
+    ctx.numCcCountMismatches = 0;
+    Buffer* withTc = decodeMccLine(&ctx, makeMccBuffer(timeCodePacket, sizeof(timeCodePacket)));
+    ASSERT_NEQ((uint64)(uintptr_t)NULL, (uint64)(uintptr_t)withTc);
+    if( withTc != NULL ) {
+        ASSERT_EQ(2 * sizeof(cc_construct), withTc->numElements);
+        ASSERT_EQ(0xFF, withTc->dataPtr[0]);
+        ASSERT_EQ(0x02, withTc->dataPtr[1]);
+        ASSERT_EQ(0x04, withTc->dataPtr[5]);
+        FreeBuffer(withTc);
+    }
     TEST_END
 }  // utest__decodeMccLineBounds()
 
