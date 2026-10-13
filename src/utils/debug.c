@@ -280,13 +280,13 @@ void DebugLog( uint8 level, uint8 section, char* file, int line, ... ) {
     
     va_start(args, line);
     char* fmt = va_arg(args, char*);
-    vsprintf(message, fmt, args);
+    vsnprintf(message, sizeof(message), fmt, args);
     va_end(args);
     
     char* basename = strrchr(file, '/');
     basename = basename ? basename+1 : file;
 
-    if( message[(strlen(message)-1)] == '\n' ) message[(strlen(message)-1)] = '\0';
+    if( (strlen(message) > 0) && (message[(strlen(message)-1)] == '\n') ) message[(strlen(message)-1)] = '\0';
     
     if( DebugExternal == NULL ) {
         if( level >= dbgFileWriteLevel[section] ) {

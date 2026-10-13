@@ -35,6 +35,8 @@
 /*--                       Public Member Variables                          --*/
 /*----------------------------------------------------------------------------*/
 
+#define MCC_MAX_LINE_CHARS                                 4096
+
 /*----------------------------------------------------------------------------*/
 /*--                      Private Member Variables                          --*/
 /*----------------------------------------------------------------------------*/
@@ -274,6 +276,13 @@ uint8 MccFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
     }
 
     ASSERT(strlen(timecode) == 11);
+    // A CDP fits in one ANC packet (at most 259 bytes), so a valid line is far shorter than
+    // this; a longer one would not fit the buffer's 16-bit size.
+    if( strlen(mccdata) > MCC_MAX_LINE_CHARS ) {
+        LOG(DEBUG_LEVEL_ERROR, DBG_FILE_IN, "Skipping MCC line at %s: longer than %d characters", timecode, MCC_MAX_LINE_CHARS);
+        free(line);
+        return TRUE;
+    }
     uint16 bufferSize = strlen(mccdata);
     Buffer* newBufferPtr = NewBuffer( BUFFER_TYPE_BYTES, bufferSize );
     newBufferPtr->numElements = bufferSize;

@@ -33,6 +33,8 @@
 /*--                      Private Member Variables                          --*/
 /*----------------------------------------------------------------------------*/
 
+#define MCC_MAX_EXPANDED_BYTES                             1024
+
 /*----------------------------------------------------------------------------*/
 /*--                     Private Member Declarations                        --*/
 /*----------------------------------------------------------------------------*/
@@ -134,6 +136,9 @@ uint8 MccDecodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
     ASSERT(((Context*)rootCtxPtr)->mccDecodeCtxPtr);
     
     Buffer* expandedBuffer = expandMccLine( inBuffer );
+    if( expandedBuffer == NULL ) {
+        return PIPELINE_SUCCESS;
+    }
     Buffer* decodedBuffer = decodeMccLine( ((Context*)rootCtxPtr)->mccDecodeCtxPtr, expandedBuffer );
 
     // decodeMccLine() returns NULL (having freed its input) when the line is too
@@ -224,6 +229,15 @@ static Buffer* expandMccLine( Buffer* buffPtr ) {
     }
     
     ASSERT((size%2) == 0);
+    // Compression letters expand up to 27 bytes each, but a valid line is one ANC packet
+    // (at most 259 bytes); refuse anything that would not fit rather than wrap the size.
+    if( (size/2) > MCC_MAX_EXPANDED_BYTES ) {
+        LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "At %02d:%02d:%02d:%02d MCC line expands to %zu bytes, more than an ANC packet; skipping",
+            buffPtr->captionTime.hour, buffPtr->captionTime.minute, buffPtr->captionTime.second,
+            buffPtr->captionTime.frame, (size/2));
+        FreeBuffer(buffPtr);
+        return NULL;
+    }
     Buffer* outputBuffer = NewBuffer(BUFFER_TYPE_BYTES, (size/2));
     outputBuffer->captionTime = buffPtr->captionTime;
     
@@ -232,13 +246,14 @@ static Buffer* expandMccLine( Buffer* buffPtr ) {
             expandMccCode( mccdata[loop], outputBuffer->dataPtr, &outputBuffer->numElements );
             loop++;
         } else if( ((mccdata[loop] >= 'A') && (mccdata[loop] <= 'F')) || ((mccdata[loop] >= 'a') && (mccdata[loop] <= 'f')) || ((mccdata[loop] >= '0') && (mccdata[loop] <= '9')) ) {
-            if( isHexByteValid(mccdata[loop], mccdata[(loop+1)]) == TRUE ) {
+            if( ((loop + 1) < buffPtr->numElements) && (isHexByteValid(mccdata[loop], mccdata[(loop+1)]) == TRUE) ) {
                 outputBuffer->dataPtr[outputBuffer->numElements] = byteFromNibbles(mccdata[loop], mccdata[(loop+1)]);
                 outputBuffer->numElements++;
             } else  {
-                LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "At %02d:%02d:%02d:%02d Unable to parse MCC Values %c %c - %s",
+                // The line is not NUL terminated, so print only what is left of it.
+                LOG(DEBUG_LEVEL_ERROR, DBG_MCC_DEC, "At %02d:%02d:%02d:%02d Unable to parse MCC Values - %.*s",
                     buffPtr->captionTime.hour, buffPtr->captionTime.minute, buffPtr->captionTime.second,
-                    buffPtr->captionTime.frame, mccdata[loop], mccdata[(loop+1)], &mccdata[loop] );
+                    buffPtr->captionTime.frame, (int)(buffPtr->numElements - loop), &mccdata[loop] );
             }
             loop = loop + 2;
         } else {
