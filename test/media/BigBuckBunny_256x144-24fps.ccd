@@ -35,7 +35,7 @@ File Format=Comcast CC Data File
 Creation Date=Friday, September 25, 2026
 Creation Time=15:36:08
 Frame Rate=23.97
-Drop Frame=True
+Drop Frame=False
 
 00:00:00,000  F2:8080  F1:8080  F2:8080  PD:0000  PS:8C74    F2 - NULL  F1 - NULL  F2 - NULL  ____|____  <--2|B:20    608: Field 2 NULL  608: Field 1 NULL  608: Field 2 NULL  ________|________  <--2P024|B:20,S03  
               PD:8C01  PD:9800  PD:3C37  PD:0229  PD:1197    DLW |BITM  DF0 |DFW1  DFW2|DFW3  DFW4|DFW5  DFW6|SWA     C1:{DLW}|00000001  C1:{DF0}|P0 F F F  VA-060 F|HrzA-055  RN-02 UL|ColN-041  WS2  PS1|C1:{SWA}  

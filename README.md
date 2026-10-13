@@ -45,8 +45,9 @@ Drop Frame. Install the command line version with `brew install media-info` or `
 or download it from [here](https://mediaarea.net/en/MediaInfo/Download). Without it, video assets are treated
 as non-Drop Frame unless set with `-d`. Drop Frame detection reads MediaInfo's "Time code of first frame", which
 older versions do not always report (MediaInfo 24.01 and 25.04 report it for the H.264 test asset, 23.04 does
-not); use a recent version, or set it with `-d`. The test suite needs it: the video test masters were generated
-with Drop Frame detected, so the tests fail without MediaInfo or with a version that does not report it.
+not); use a recent version, or set it with `-d`. Drop Frame only exists at 29.97 and 59.94 fps, so it is ignored
+at other rates. The test suite's Drop Frame detection test is skipped without MediaInfo, and fails with a version
+that does not report the time code.
 
 ```
 make caption-inspector

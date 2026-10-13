@@ -286,6 +286,12 @@ uint8 MovFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
                         LOG(DEBUG_LEVEL_INFO, DBG_MOV_FILE, "Dropframe forced to FALSE");
                     }
                 } else {
+                    if( (ctxPtr->isDropframe == TRUE) && (tmpFramerate != 2997) && (tmpFramerate != 5994) ) {
+                        // Drop-frame timecode only exists at 29.97 and 59.94.
+                        LOG(DEBUG_LEVEL_WARN, DBG_MOV_FILE, "Ignoring Dropframe reported at %d.%02d fps; it only applies to 29.97 and 59.94",
+                            tmpFramerate / 100, tmpFramerate % 100);
+                        ctxPtr->isDropframe = FALSE;
+                    }
                     if( ctxPtr->isDropframe ) {
                         LOG(DEBUG_LEVEL_INFO, DBG_MOV_FILE, "Dropframe = TRUE");
                     } else {
