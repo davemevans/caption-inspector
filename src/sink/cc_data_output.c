@@ -546,7 +546,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                 channelNum = 4;
             }
         }
-        ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
+        ctxPtr->currentChannel[ccType] = channelNum;
 
         len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d - MDR", channelNum );
         ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
@@ -685,7 +685,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         } else {
             channelNum = (ccType == CC_DATA_TYPE__FIELD_1) ? 2 : 4;
         }
-        ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
+        ctxPtr->currentChannel[ccType] = channelNum;
 
         len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d - MDR", channelNum );
         ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
@@ -711,7 +711,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                 channelNum = 4;
             }
         }
-        ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
+        ctxPtr->currentChannel[ccType] = channelNum;
 
         len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d - TAB", channelNum );
         ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
@@ -724,6 +724,8 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         } else {
             channelNum = (ccType == CC_DATA_TYPE__FIELD_1) ? 2 : 4;
         }
+
+        ctxPtr->currentChannel[ccType] = channelNum;
 
         len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d - CHS", channelNum );
         ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
@@ -745,8 +747,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                 channelNum = 4;
             }
         }
-// TODO - HACK - This needs to be throttled on crappy captions.
-//        ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
+        ctxPtr->currentChannel[ccType] = channelNum;
 
         len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d - PAC", channelNum );
         ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
@@ -893,7 +894,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                 channelNum = 4;
             }
         }
-        ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
+        ctxPtr->currentChannel[ccType] = channelNum;
 
         // Glyphs are 1-3 bytes of UTF-8; narrow the gap so the closing quote still fits.
         snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, (strlen(Line21DecodeSpecialCharacter(ccData2)) > 2) ? "Ch%d \"%s\"" : "Ch%d  \"%s\"",
@@ -939,7 +940,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                 channelNum = 4;
             }
         }
-        ASSERT(channelNum == ctxPtr->currentChannel[ccType]);
+        ctxPtr->currentChannel[ccType] = channelNum;
         snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, (strlen(Line21DecodeExtendedCharacter(charSet, ccData2)) > 2) ? "Ch%d \"%s\"" : "Ch%d  \"%s\"",
                  channelNum, Line21DecodeExtendedCharacter(charSet, ccData2));
         if( strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-2) ) {
