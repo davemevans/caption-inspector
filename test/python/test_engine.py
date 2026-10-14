@@ -21,7 +21,7 @@ c_integ_test_suites = ['itest__buffer_utils', 'itest__pipeline_utils']
 c_unit_test_suites = ['utest__buffer_utils_c', 'utest__cc_utils_c', 'utest__external_adaptor_c',
                       'utest__output_utils_c', 'utest__pipeline_utils_c', 'utest__types_c',
                       'utest__cc_data_output_c', 'utest__mcc_decode_c',
-                      'utest__line21_decode_c']
+                      'utest__line21_decode_c', 'utest__dtvcc_decode_c']
 
 
 # Optional external tooling. pytest runs the Python test suites; xunit-viewer
