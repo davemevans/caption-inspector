@@ -40,6 +40,12 @@
 #define CC_DATA_ELEMENT_DEC_STR_SIZE                            18
 #define CC_DATA_ELEMENT_DEC_STR_PADDING_SIZE                    19
 #define CC_DATA_ELEMENT_HALF_DEC_STR_SIZE                        9
+// Columns are padded to a width in screen cells. Glyphs can take more bytes than cells
+// (e.g. a 608 solid block, 3 bytes in 1 cell, or a CJK character, 3 bytes in 2), up to
+// two more in each 708 half column or 608 character, so a column holds four more.
+#define CC_DATA_ELEMENT_WIDE_GLYPH_EXTRA                         4
+#define CC_DATA_ELEMENT_HALF_TAG_BUF_SIZE                       (CC_DATA_ELEMENT_HALF_TAG_STR_SIZE + CC_DATA_ELEMENT_WIDE_GLYPH_EXTRA)
+#define CC_DATA_ELEMENT_HALF_DEC_BUF_SIZE                       (CC_DATA_ELEMENT_HALF_DEC_STR_SIZE + CC_DATA_ELEMENT_WIDE_GLYPH_EXTRA)
 
 #define NUM_CC_DATA_ELEMENTS_PER_LINE                            5
 
@@ -85,8 +91,8 @@
 
 typedef struct {
     char hexStr[CC_DATA_ELEMENT_HEX_STR_SIZE];
-    char tagStr[CC_DATA_ELEMENT_TAG_STR_SIZE];
-    char decStr[CC_DATA_ELEMENT_DEC_STR_SIZE];
+    char tagStr[CC_DATA_ELEMENT_TAG_STR_SIZE + CC_DATA_ELEMENT_WIDE_GLYPH_EXTRA];
+    char decStr[CC_DATA_ELEMENT_DEC_STR_SIZE + CC_DATA_ELEMENT_WIDE_GLYPH_EXTRA];
 } CcdElemOut;
 
 typedef struct {
