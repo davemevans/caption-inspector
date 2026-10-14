@@ -89,6 +89,7 @@ LinkInfo Line21DecodeInitialize( Context* rootCtxPtr, boolean processOnly ) {
         ctxPtr->captioningChange[loop] = FALSE;
         ctxPtr->captioningStart[loop] = FALSE;
     }
+    ctxPtr->numMiscCodeFieldMismatches = 0;
 
     InitSinks(&ctxPtr->sinks, CC_DATA___LINE21_DATA);
 
@@ -275,6 +276,11 @@ uint8 Line21DecodeShutdown( void* rootCtxPtr ) {
     Line21DecodeCtx* ctxPtr = ((Context*)rootCtxPtr)->line21DecodeCtxPtr;
     Sinks sinks = ctxPtr->sinks;
     boolean processOnly = ctxPtr->processOnly;
+
+    if( ctxPtr->numMiscCodeFieldMismatches > 1 ) {
+        LOG(DEBUG_LEVEL_WARN, DBG_608_DEC, "Suppressed %d further control codes with the other field's prefix",
+            ctxPtr->numMiscCodeFieldMismatches - 1);
+    }
 
     for( int loop = 1; loop <= LINE21_MAX_NUM_CHANNELS; loop++ ) {
         if( ctxPtr->dataFound[loop] == TRUE ) {
@@ -482,45 +488,30 @@ static boolean decodeGlobalCmd( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 cc
     ASSERT(codePtr);
     codePtr->codeType = LINE21_GLOBAL_CONTROL_CODE;
     
-    switch( ccData1 ) {
-        case GLOBAL_CTRL_CODE_CC1:
-            codePtr->channelNum = LINE21_CHANNEL_1;
-            ctxPtr->dataFound[LINE21_CHANNEL_1] = TRUE;
-            codePtr->code.globalControl.chan = LINE21_CHANNEL_1;
-            ctxPtr->currentChannel[codePtr->fieldNum] = LINE21_CHANNEL_1;
-            break;
-        case GLOBAL_CTRL_CODE_CC2:
-            codePtr->channelNum = LINE21_CHANNEL_2;
-            ctxPtr->dataFound[LINE21_CHANNEL_2] = TRUE;
-            codePtr->code.globalControl.chan = LINE21_CHANNEL_2;
-            ctxPtr->currentChannel[codePtr->fieldNum] = LINE21_CHANNEL_2;
-            break;
-        case GLOBAL_CTRL_CODE_CC3:
-            codePtr->channelNum = LINE21_CHANNEL_3;
-            ctxPtr->dataFound[LINE21_CHANNEL_3] = TRUE;
-            codePtr->code.globalControl.chan = LINE21_CHANNEL_3;
-            ctxPtr->currentChannel[codePtr->fieldNum] = LINE21_CHANNEL_3;
-            break;
-        case GLOBAL_CTRL_CODE_CC4:
-            codePtr->channelNum = LINE21_CHANNEL_4;
-            ctxPtr->dataFound[LINE21_CHANNEL_4] = TRUE;
-            codePtr->code.globalControl.chan = LINE21_CHANNEL_4;
-            ctxPtr->currentChannel[codePtr->fieldNum] = LINE21_CHANNEL_4;
-            break;
-        default:
-            codePtr->code.globalControl.chan = LINE21_CHANNEL_UNKONWN;
-            LOG(DEBUG_LEVEL_ERROR, DBG_608_DEC, "Impossible Code Branch: 0x%02X", ccData1);
-            break;
+    // Misc control codes carry 0x14/0x1C on field 1 and 0x15/0x1D on field 2 (CTA-608-E 8.4),
+    // but some encoders send the field 1 prefix on field 2 too. The field picks CC1/CC2 or
+    // CC3/CC4, and bit 3 picks the data channel within it.
+    boolean isDataChannel2 = ((ccData1 == GLOBAL_CTRL_CODE_CC2) || (ccData1 == GLOBAL_CTRL_CODE_CC4));
+    boolean hasField1Prefix = ((ccData1 == GLOBAL_CTRL_CODE_CC1) || (ccData1 == GLOBAL_CTRL_CODE_CC2));
+    if( codePtr->fieldNum == CEA608E_LINE21_FIELD_1_CC ) {
+        codePtr->channelNum = (isDataChannel2 == TRUE) ? LINE21_CHANNEL_2 : LINE21_CHANNEL_1;
+    } else {
+        codePtr->channelNum = (isDataChannel2 == TRUE) ? LINE21_CHANNEL_4 : LINE21_CHANNEL_3;
+    }
+    codePtr->code.globalControl.chan = codePtr->channelNum;
+    ctxPtr->currentChannel[codePtr->fieldNum] = codePtr->channelNum;
+
+    if( hasField1Prefix != (codePtr->fieldNum == CEA608E_LINE21_FIELD_1_CC) ) {
+        if( ctxPtr->numMiscCodeFieldMismatches == 0 ) {
+            encodeTimeCode(captionTimePtr, captionTimeStr);
+            LOG(DEBUG_LEVEL_WARN, DBG_608_DEC, "Control code 0x%02X 0x%02X at %s has the field %d prefix but is on field %d; decoding it as CC%d --- Suppressing Subsequent Warnings.",
+                ccData1, ccData2, captionTimeStr, (hasField1Prefix == TRUE) ? 1 : 2, codePtr->fieldNum + 1, codePtr->channelNum);
+        }
+        ctxPtr->numMiscCodeFieldMismatches++;
     }
 
-    if( ((codePtr->channelNum == LINE21_CHANNEL_1) && (codePtr->fieldNum == CEA608E_LINE21_FIELD_2_CC)) ||
-        ((codePtr->channelNum == LINE21_CHANNEL_2) && (codePtr->fieldNum == CEA608E_LINE21_FIELD_2_CC)) ||
-        ((codePtr->channelNum == LINE21_CHANNEL_3) && (codePtr->fieldNum == CEA608E_LINE21_FIELD_1_CC)) ||
-        ((codePtr->channelNum == LINE21_CHANNEL_4) && (codePtr->fieldNum == CEA608E_LINE21_FIELD_1_CC)) ) {
-        LOG(DEBUG_LEVEL_ERROR, DBG_608_DEC, "Channel/Field Mismatch: Chan - %d Field - %d", codePtr->channelNum, codePtr->fieldNum);
-    }
-    
     codePtr->code.globalControl.cmd = ccData2;
+    ctxPtr->dataFound[codePtr->channelNum] = TRUE;
 
     if( (ccData2 == GLOBAL_CTRL_CODE__RCL) || (ccData2 == GLOBAL_CTRL_CODE__EOC) ) {
         if( (ccData2 != GLOBAL_CTRL_CODE__RCL) && (ctxPtr->captioningStart[codePtr->code.globalControl.chan] == FALSE) ) {
