@@ -168,6 +168,7 @@ typedef struct {
     boolean isPaintOnCaptioning[LINE21_MAX_NUM_CHANNELS+1];
     boolean captioningChange[LINE21_MAX_NUM_CHANNELS+1];
     boolean captioningStart[LINE21_MAX_NUM_CHANNELS+1];
+    uint32 numMiscCodeFieldMismatches;
 } Line21DecodeCtx;
 
 typedef struct {
