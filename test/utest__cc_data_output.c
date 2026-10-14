@@ -281,6 +281,77 @@ void utest__decode608Pair( TEST_SUITE_RECEIVED_ARGUMENTS ) {
 }  // utest__decode608Pair()
 
 /*------------------------------------------------------------------------------
+ | FUNCTION UNDER TEST: decodePacketData() - Variable-length C3 commands
+ |
+ | TEST CASES:
+ |     1) EXT1 0x90 is followed by a header byte whose low 5 bits count the data
+ |        bytes; those are skipped and the next byte is text again.
+ |     2) A header with a length of 0 ends the command at the header.
+ -------------------------------------------------------------------------------*/
+void utest__variableLengthC3( TEST_SUITE_RECEIVED_ARGUMENTS ) {
+    TEST_INITIALIZE
+    CcDataOutputCtx ctx;
+    TextString txtStr;
+    char tagStr[CC_DATA_ELEMENT_HALF_TAG_STR_SIZE];
+    char decStr[CC_DATA_ELEMENT_HALF_DEC_STR_SIZE];
+    char errStr[CEA708_ERROR_STR_SIZE];
+    uint8 command[] = { 0x10, 0x90, 0xC2, 0x41, 0x42, 0x43 };   // EXT1, 0x90, OSC with 2 bytes, 2 bytes, 'C'
+    uint8 empty[] = { 0x10, 0x9F, 0xC0, 0x44 };                 // EXT1, 0x9F, OSC with 0 bytes, 'D'
+
+    TEST_START("Test Case: decodePacketData() - A variable-length C3 command is skipped by its length.");
+    ctx.cea708ErrNum = 0;
+    ctx.currentService = 1;
+    ctx.cea708State = CEA708_STATE_DATA_WAIT;
+    ctx.cea708PacketBytesRemaining = 20;
+    ctx.cea708BlockBytesRemaining = 20;
+    clearTextString(&txtStr);
+    for( int loop = 0; loop < sizeof(command); loop++ ) {
+        errStr[0] = '\0';
+        decodePacketData(&ctx, command[loop], tagStr, decStr, &txtStr, errStr);
+    }
+    ASSERT_STREQ("C", txtStr.txtStr708[0]);
+    ASSERT_EQ(CEA708_STATE_DATA_WAIT, ctx.cea708State);
+    TEST_END
+
+    TEST_START("Test Case: decodePacketData() - A variable-length C3 command can have no data.");
+    ctx.cea708ErrNum = 0;
+    ctx.currentService = 1;
+    ctx.cea708State = CEA708_STATE_DATA_WAIT;
+    ctx.cea708PacketBytesRemaining = 20;
+    ctx.cea708BlockBytesRemaining = 20;
+    clearTextString(&txtStr);
+    for( int loop = 0; loop < sizeof(empty); loop++ ) {
+        errStr[0] = '\0';
+        decodePacketData(&ctx, empty[loop], tagStr, decStr, &txtStr, errStr);
+    }
+    ASSERT_STREQ("D", txtStr.txtStr708[0]);
+    TEST_END
+}  // utest__variableLengthC3()
+
+/*------------------------------------------------------------------------------
+ | FUNCTION UNDER TEST: appendText()
+ |
+ | TEST CASES:
+ |     1) A multi-byte glyph that does not fit is dropped whole, and a shorter
+ |        one that fits is still added.
+ -------------------------------------------------------------------------------*/
+void utest__appendText( TEST_SUITE_RECEIVED_ARGUMENTS ) {
+    TEST_INITIALIZE
+    char text[MAX_CHARS_PER_LINE_PER_CHANNEL];
+
+    TEST_START("Test Case: appendText() - A glyph that does not fit is not cut.");
+    memset(text, 'x', MAX_CHARS_PER_LINE_PER_CHANNEL - 3);
+    text[MAX_CHARS_PER_LINE_PER_CHANNEL - 3] = '\0';
+    appendText(text, "■");
+    ASSERT_EQ(MAX_CHARS_PER_LINE_PER_CHANNEL - 3, strlen(text));
+    appendText(text, "é");
+    ASSERT_EQ(MAX_CHARS_PER_LINE_PER_CHANNEL - 1, strlen(text));
+    appendText(text, "a");
+    ASSERT_EQ(MAX_CHARS_PER_LINE_PER_CHANNEL - 1, strlen(text));
+    TEST_END
+}  // utest__appendText()
+
+/*------------------------------------------------------------------------------
  | UNTESTED FUNCTIONS:
  |    Most of cc_data_output.c drives file output and is exercised by the
  |    integration/Python pipeline tests; this suite covers the Service Number
@@ -303,6 +374,14 @@ int main( int argc, char* argv[] ) {
 
     TEST_SUITE_START("Test Suite: cc_data_output.c -- decode608Pair()");
     utest__decode608Pair( &tmpNumSuccessfulTests, &tmpNumFailedTests );
+    TEST_SUITE_END
+
+    TEST_SUITE_START("Test Suite: cc_data_output.c -- Variable-length C3 Commands");
+    utest__variableLengthC3( &tmpNumSuccessfulTests, &tmpNumFailedTests );
+    TEST_SUITE_END
+
+    TEST_SUITE_START("Test Suite: cc_data_output.c -- appendText()");
+    utest__appendText( &tmpNumSuccessfulTests, &tmpNumFailedTests );
     TEST_SUITE_END
 
     SHUTDOWN_TEST_FRAMEWORK

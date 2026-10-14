@@ -28,5 +28,6 @@ test/utest__types_c
 test/utest__cc_data_output_c
 test/utest__mcc_decode_c
 test/utest__line21_decode_c
+test/utest__dtvcc_decode_c
 test/itest__buffer_utils
 test/itest__pipeline_utils
