@@ -248,6 +248,9 @@ uint8 DtvccOutShutdown( void* rootCtxPtr ) {
 
     for( int loop = 0; loop < DTVCC_MAX_NUM_SERVICES; loop++ ) {
         if( ((Context*)rootCtxPtr)->dtvccOutputCtxPtr->fp[loop] != NULL ) {
+            if( ((Context*)rootCtxPtr)->dtvccOutputCtxPtr->textStream[loop] == TRUE ) {
+                writeToFile(((Context*)rootCtxPtr)->dtvccOutputCtxPtr->fp[loop], "\"");
+            }
             closeFile(((Context *) rootCtxPtr)->dtvccOutputCtxPtr->fp[loop]);
             anyFiles = TRUE;
         }
