@@ -47,6 +47,7 @@
 /* Size Related Defines for the Specific Contexts */
 #define MAX_FILE_NAME_LEN                                  256
 #define LINE21_MAX_NUM_CHANNELS                              4
+#define LINE21_MAX_NUM_SERVICES                              8  // CC1-CC4, then T1-T4
 #define DTVCC_MAX_NUM_SERVICES                              63
 #define LINE21_NUMBER_OF_FIELDS                              2
 
@@ -169,6 +170,7 @@ typedef struct {
     boolean isPaintOnCaptioning[LINE21_MAX_NUM_CHANNELS+1];
     boolean captioningChange[LINE21_MAX_NUM_CHANNELS+1];
     boolean captioningStart[LINE21_MAX_NUM_CHANNELS+1];
+    boolean isTextMode[LINE21_MAX_NUM_CHANNELS+1];
     uint32 numMiscCodeFieldMismatches;
 } Line21DecodeCtx;
 
@@ -234,6 +236,7 @@ typedef struct {
     uint8 currentChannel[LINE21_NUMBER_OF_FIELDS];
     boolean inXds[LINE21_NUMBER_OF_FIELDS];
     uint16 last608Pair[LINE21_NUMBER_OF_FIELDS];
+    boolean isTextMode[LINE21_MAX_NUM_CHANNELS+1];
     uint8 currentService;
     uint16 cea708ErrNum;
     uint8 cea708State;
@@ -245,8 +248,8 @@ typedef struct {
 } CcDataOutputCtx;
 
 typedef struct {
-    FILE* fp[LINE21_MAX_NUM_CHANNELS];
-    boolean textStream[LINE21_MAX_NUM_CHANNELS];
+    FILE* fp[LINE21_MAX_NUM_SERVICES];
+    boolean textStream[LINE21_MAX_NUM_SERVICES];
     uint8 outputWhichChannel;
     char outputFileName[MAX_FILE_NAME_LEN];
 } Line21OutputCtx;

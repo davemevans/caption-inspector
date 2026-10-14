@@ -652,6 +652,7 @@ typedef struct {
     uint8 channelNum;
     uint8 fieldNum;
     uint8 codeType;
+    boolean isText;    // Text service T1-T4 on this channel's data channel, not caption channel CC1-CC4
     union {
         BasicCharsCodeType basicChars;
         SpecialCharCodeType specialChar;

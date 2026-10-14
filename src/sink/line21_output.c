@@ -89,6 +89,7 @@ static char* colorNameFull[10] = {
 static char* Line21StyleCodeToString( uint8 );
 static char* Line21ColorCodeToString( uint8 );
 static void writeLine21codeToText( Line21OutputCtx*, Line21Code, CaptionTime* );
+static uint8 outputFileIndex( Line21Code* );
 
 /*----------------------------------------------------------------------------*/
 /*--                       Public Member Functions                          --*/
@@ -114,7 +115,7 @@ LinkInfo Line21OutInitialize( Context* ctxPtr ) {
     ASSERT(!ctxPtr->line21OutputCtxPtr);
 
     ctxPtr->line21OutputCtxPtr = malloc(sizeof(Line21OutputCtx));
-    for( int loop = 0; loop < LINE21_MAX_NUM_CHANNELS; loop++ ) {
+    for( int loop = 0; loop < LINE21_MAX_NUM_SERVICES; loop++ ) {
         ctxPtr->line21OutputCtxPtr->textStream[loop] = FALSE;
         ctxPtr->line21OutputCtxPtr->fp[loop] = NULL;
     }
@@ -158,22 +159,29 @@ uint8 Line21OutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
 
     for( int loop = 0; loop < buffPtr->numElements; loop++ ) {
         ASSERT(line21CodePtr[loop].channelNum);
+        uint8 fileIdx = outputFileIndex(&line21CodePtr[loop]);
 
-        if( ctxPtr->fp[line21CodePtr[loop].channelNum-1] == NULL ) {
+        if( ctxPtr->fp[fileIdx] == NULL ) {
+            // Caption channels go to -C1..-C4.608 and Text services to -T1..-T4.608.
+            char serviceType = (line21CodePtr[loop].isText == TRUE) ? 'T' : 'C';
             char uniqueFileName[MAX_FILE_NAME_LEN];
             strncpy(uniqueFileName, ctxPtr->outputFileName, MAX_FILE_NAME_LEN);
             char* tmpCharPtr = strrchr(uniqueFileName, '.');
             ASSERT(tmpCharPtr);
             *tmpCharPtr = '\0';
             char suffix[10];
-            sprintf(suffix, "-C%d.608", line21CodePtr[loop].channelNum);
+            sprintf(suffix, "-%c%d.608", serviceType, line21CodePtr[loop].channelNum);
             strncat(uniqueFileName, suffix, (MAX_FILE_NAME_LEN - strlen(uniqueFileName)));
-            ctxPtr->fp[line21CodePtr[loop].channelNum-1] = fileOutputInit(uniqueFileName);
+            ctxPtr->fp[fileIdx] = fileOutputInit(uniqueFileName);
             LOG(DEBUG_LEVEL_INFO, DBG_608_OUT, "Creating new Line-21 File for Output: %s", uniqueFileName);
             tmpCharPtr = strrchr(uniqueFileName, '.');
             ASSERT(tmpCharPtr);
             *tmpCharPtr = '\0';
-            writeToFile(ctxPtr->fp[line21CodePtr[loop].channelNum-1], "Decoded Line 21 / CEA-608 for Asset: %s - Channel: %d", uniqueFileName, line21CodePtr[loop].channelNum);
+            if( line21CodePtr[loop].isText == TRUE ) {
+                writeToFile(ctxPtr->fp[fileIdx], "Decoded Line 21 / CEA-608 for Asset: %s - Text: %d", uniqueFileName, line21CodePtr[loop].channelNum);
+            } else {
+                writeToFile(ctxPtr->fp[fileIdx], "Decoded Line 21 / CEA-608 for Asset: %s - Channel: %d", uniqueFileName, line21CodePtr[loop].channelNum);
+            }
         }
 
         writeLine21codeToText(ctxPtr, line21CodePtr[loop], &buffPtr->captionTime);
@@ -206,7 +214,7 @@ uint8 Line21OutShutdown( void* rootCtxPtr ) {
     Line21OutputCtx* ctxPtr = ((Context*)rootCtxPtr)->line21OutputCtxPtr;
     boolean anyFiles = FALSE;
 
-    for( int loop = 0; loop < LINE21_MAX_NUM_CHANNELS; loop++ ) {
+    for( int loop = 0; loop < LINE21_MAX_NUM_SERVICES; loop++ ) {
         if( ctxPtr->fp[loop] != NULL ) {
             closeFile(ctxPtr->fp[loop]);
             anyFiles = TRUE;
@@ -389,7 +397,7 @@ static char* Line21ColorCodeToString( uint8 colorCode ) {
  -------------------------------------------------------------------------------*/
 static void writeLine21codeToText( Line21OutputCtx* ctxPtr, Line21Code codeToDecode, CaptionTime* captionTimePtr ) {
     ASSERT(codeToDecode.channelNum);
-    uint8 fileIdx = codeToDecode.channelNum - 1;
+    uint8 fileIdx = outputFileIndex(&codeToDecode);
     ASSERT(ctxPtr->fp[fileIdx]);
 
     if( (codeToDecode.codeType == LINE21_BASIC_CHARS) || (codeToDecode.codeType == LINE21_SPECIAL_CHAR) ||
@@ -430,7 +438,10 @@ static void writeLine21codeToText( Line21OutputCtx* ctxPtr, Line21Code codeToDec
                 (codeToDecode.code.globalControl.cmd == GLOBAL_CTRL_CODE__RDC) ||
                 (codeToDecode.code.globalControl.cmd == GLOBAL_CTRL_CODE__RCL) ||
                 (codeToDecode.code.globalControl.cmd == GLOBAL_CTRL_CODE__EDM) ||
-                (codeToDecode.code.globalControl.cmd == GLOBAL_CTRL_CODE__EOC) ) {
+                (codeToDecode.code.globalControl.cmd == GLOBAL_CTRL_CODE__EOC) ||
+                (codeToDecode.code.globalControl.cmd == GLOBAL_CTRL_CODE__TR) ||
+                (codeToDecode.code.globalControl.cmd == GLOBAL_CTRL_CODE__RTD) ||
+                ((codeToDecode.isText == TRUE) && (codeToDecode.code.globalControl.cmd == GLOBAL_CTRL_CODE__CR)) ) {
                 if( captionTimePtr->source == CAPTION_TIME_PTS_NUMBERING ) {
                     writeToFile(ctxPtr->fp[fileIdx], "\n%02d:%02d:%02d,%03d -", captionTimePtr->hour, captionTimePtr->minute,
                                 captionTimePtr->second, captionTimePtr->millisecond);
@@ -481,3 +492,18 @@ static void writeLine21codeToText( Line21OutputCtx* ctxPtr, Line21Code codeToDec
             break;
     }
 }  // line21codeToText()
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    outputFileIndex()
+ |
+ | DESCRIPTION:
+ |    This method returns the file a code is written to: CC1-CC4 first, then T1-T4.
+ -------------------------------------------------------------------------------*/
+static uint8 outputFileIndex( Line21Code* codePtr ) {
+    ASSERT((codePtr->channelNum >= LINE21_CHANNEL_1) && (codePtr->channelNum <= LINE21_CHANNEL_4));
+    if( codePtr->isText == TRUE ) {
+        return LINE21_MAX_NUM_CHANNELS + codePtr->channelNum - 1;
+    }
+    return codePtr->channelNum - 1;
+}  // outputFileIndex()

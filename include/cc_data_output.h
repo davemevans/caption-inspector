@@ -44,6 +44,7 @@
 #define NUM_CC_DATA_ELEMENTS_PER_LINE                            5
 
 #define NUM_608_CHANNELS                                         4
+#define NUM_608_SERVICES                                         8  // CC1-CC4, then T1-T4
 #define NUM_708_SERVICES                                        63
 #define EXTENDED_SRV_NUM_MIN                                     7
 #define MAX_CHARS_PER_LINE_PER_CHANNEL                          64
@@ -89,7 +90,7 @@ typedef struct {
 } CcdElemOut;
 
 typedef struct {
-    char txtStr608[NUM_608_CHANNELS][MAX_CHARS_PER_LINE_PER_CHANNEL];
+    char txtStr608[NUM_608_SERVICES][MAX_CHARS_PER_LINE_PER_CHANNEL];
     char txtStr708[NUM_708_SERVICES][MAX_CHARS_PER_LINE_PER_CHANNEL];
 } TextString;
 

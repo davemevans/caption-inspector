@@ -47,6 +47,7 @@ static const char* ccTypeStr[4] = { "1", "2", "D", "S" };
 
 static uint16 add708Error( CcDataOutputCtx*, char* );
 static void appendText( char *, const char* );
+static uint8 textIndex608( CcDataOutputCtx*, uint8 );
 static void decode608Pair( CcDataOutputCtx*, uint8, uint8, uint8, CcdElemOut*, TextString* );
 static void decodePacketStart( CcDataOutputCtx*, uint8, char*, char*, char* );
 static void decodePacketData( CcDataOutputCtx*, uint8, char*, char*, TextString*, char* );
@@ -90,6 +91,9 @@ LinkInfo CcDataOutInitialize( Context* rootCtxPtr ) {
     ctxPtr->inXds[1] = FALSE;
     ctxPtr->last608Pair[0] = 0;
     ctxPtr->last608Pair[1] = 0;
+    for( int loop = 0; loop <= LINE21_MAX_NUM_CHANNELS; loop++ ) {
+        ctxPtr->isTextMode[loop] = FALSE;
+    }
     ctxPtr->currentService = UNKNOWN_SERVICE;
     ctxPtr->cea708ErrNum = 0;
     ctxPtr->cea708State = CEA708_STATE_UNKNOWN;
@@ -211,7 +215,7 @@ uint8 CcDataOutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
     CcdLineOut lineOut;
     lineOut.numElements = 0;
     boolean printNewline = FALSE;
-    for( int loop = 0; loop < NUM_608_CHANNELS; loop++ ) {
+    for( int loop = 0; loop < NUM_608_SERVICES; loop++ ) {
         lineOut.txtStr.txtStr608[loop][0] = '\0';
     }
     for( int loop = 0; loop < NUM_708_SERVICES; loop++ ) {
@@ -320,13 +324,17 @@ uint8 CcDataOutProcNextBuffer( void* rootCtxPtr, Buffer* buffPtr ) {
     }
 
     boolean anyTextWritten = FALSE;
-    for( int loop = 0; loop < NUM_608_CHANNELS; loop++ ) {
+    for( int loop = 0; loop < NUM_608_SERVICES; loop++ ) {
         if( strlen(lineOut.txtStr.txtStr608[loop]) > 0 ) {
             if( anyTextWritten == FALSE ) {
                 writeToFile(ctxPtr->fp, "\nTEXT: ");
                 anyTextWritten = TRUE;
             }
-            writeToFile(ctxPtr->fp, "Ch%d - \"%s\" ", loop+1, lineOut.txtStr.txtStr608[loop]);
+            if( loop < NUM_608_CHANNELS ) {
+                writeToFile(ctxPtr->fp, "Ch%d - \"%s\" ", loop+1, lineOut.txtStr.txtStr608[loop]);
+            } else {
+                writeToFile(ctxPtr->fp, "T%d - \"%s\" ", loop+1-NUM_608_CHANNELS, lineOut.txtStr.txtStr608[loop]);
+            }
             lineOut.txtStr.txtStr608[loop][0] = '\0';
         }
     }
@@ -433,6 +441,9 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         } else if( ccData1 >= XDS_CTRL_FIRST && ccData1 < XDS_CTRL_END ) {
             static const char* xdsClass[7] = { "Current", "Future", "Channel", "Misc", "PublSvc", "Reservd", "Private" };
             ctxPtr->inXds[ccType] = TRUE;
+            // An XDS packet also ends Text Mode on field 2.
+            ctxPtr->isTextMode[3] = FALSE;
+            ctxPtr->isTextMode[4] = FALSE;
             len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "XDS %-7s %-5s", xdsClass[(ccData1 - 1) / 2],
                            (ccData1 & 0x01) ? "Start" : "Cont" );
         } else {
@@ -451,6 +462,14 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         }
         if( (ccType == CC_DATA_TYPE__FIELD_1) != ((ccData1 == GLOBAL_CTRL_CODE_CC1) || (ccData1 == GLOBAL_CTRL_CODE_CC2)) ) {
             LOG(DEBUG_LEVEL_VERBOSE, DBG_CCD_OUT, "Control code prefix 0x%02X on Field %s, decoded as Chan - %d", ccData1, ccTypeStr[ccType], channelNum);
+        }
+
+        // TR and RTD start Text Mode (T1-T4) on the data channel; caption mode codes end it.
+        if( (ccData2 == GLOBAL_CTRL_CODE__TR) || (ccData2 == GLOBAL_CTRL_CODE__RTD) ) {
+            ctxPtr->isTextMode[channelNum] = TRUE;
+        } else if( (ccData2 == GLOBAL_CTRL_CODE__RCL) || (ccData2 == GLOBAL_CTRL_CODE__RDC) || (ccData2 == GLOBAL_CTRL_CODE__EOC) ||
+                   (ccData2 == GLOBAL_CTRL_CODE__RU2) || (ccData2 == GLOBAL_CTRL_CODE__RU3) || (ccData2 == GLOBAL_CTRL_CODE__RU4) ) {
+            ctxPtr->isTextMode[channelNum] = FALSE;
         }
 
         ctxPtr->currentChannel[ccType] = channelNum;
@@ -890,7 +909,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         }
         ASSERT(strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
         if( isRepeat == FALSE ) {
-            appendText(txtStr->txtStr608[channelNum-1], Line21DecodeSpecialCharacter(ccData2));
+            appendText(txtStr->txtStr608[textIndex608(ctxPtr, channelNum)], Line21DecodeSpecialCharacter(ccData2));
         }
     } else if( ((ccData1 == EXT_W_EURO_CHAR_SET_CH_1_3_SF) || (ccData1 == EXT_W_EURO_CHAR_SET_CH_1_3_FG) ||
                 (ccData1 == EXT_W_EURO_CHAR_SET_CH_2_4_SF) || (ccData1 == EXT_W_EURO_CHAR_SET_CH_2_4_FG)) &&
@@ -934,7 +953,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
         }
         ASSERT(strlen(outputPtr->tagStr) == (CC_DATA_ELEMENT_TAG_STR_SIZE-1));
         if( isRepeat == FALSE ) {
-            appendText(txtStr->txtStr608[channelNum-1], Line21DecodeExtendedCharacter(charSet, ccData2));
+            appendText(txtStr->txtStr608[textIndex608(ctxPtr, channelNum)], Line21DecodeExtendedCharacter(charSet, ccData2));
         }
     } else if( (((ccData1 >= FIRST_BASIC_CHAR) && (ccData1 <= LAST_BASIC_CHAR)) || (ccData1 == NULL_BASIC_CHAR)) &&
                (((ccData2 >= FIRST_BASIC_CHAR) && (ccData2 <= LAST_BASIC_CHAR)) || (ccData2 == NULL_BASIC_CHAR)) ) {
@@ -964,8 +983,8 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                 ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
             }
             if( ctxPtr->currentChannel[ccType] != UNKOWN_CHANNEL ) {
-                appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData1));
-                appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData2));
+                appendText(txtStr->txtStr608[textIndex608(ctxPtr, ctxPtr->currentChannel[ccType])], Line21DecodeBasicNACharacter(ccData1));
+                appendText(txtStr->txtStr608[textIndex608(ctxPtr, ctxPtr->currentChannel[ccType])], Line21DecodeBasicNACharacter(ccData2));
             }
         } else if( (ccData1 != 0) && (ccData2 == 0) ) {
             if( strlen(Line21DecodeBasicNACharacter(ccData1)) == 1 ) {
@@ -982,7 +1001,7 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                 ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
             }
             if( ctxPtr->currentChannel[ccType] != UNKOWN_CHANNEL ) {
-                appendText(txtStr->txtStr608[ctxPtr->currentChannel[ccType]-1], Line21DecodeBasicNACharacter(ccData1));
+                appendText(txtStr->txtStr608[textIndex608(ctxPtr, ctxPtr->currentChannel[ccType])], Line21DecodeBasicNACharacter(ccData1));
             }
         } else {
             ASSERT(0);
@@ -1800,6 +1819,22 @@ static void appendText( char* dst, const char* src ) {
         strcat(dst, src);
     }
 }  // appendText()
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    textIndex608()
+ |
+ | DESCRIPTION:
+ |    This function returns where a 608 channel's text is collected: CC1-CC4,
+ |    or T1-T4 while that data channel is in Text Mode.
+ -------------------------------------------------------------------------------*/
+static uint8 textIndex608( CcDataOutputCtx* ctxPtr, uint8 channelNum ) {
+    ASSERT((channelNum >= 1) && (channelNum <= NUM_608_CHANNELS));
+    if( ctxPtr->isTextMode[channelNum] == TRUE ) {
+        return NUM_608_CHANNELS + channelNum - 1;
+    }
+    return channelNum - 1;
+}  // textIndex608()
 
 /*------------------------------------------------------------------------------
  | NAME:
