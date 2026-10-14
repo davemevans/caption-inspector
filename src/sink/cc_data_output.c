@@ -48,6 +48,7 @@ static const char* ccTypeStr[4] = { "1", "2", "D", "S" };
 static uint16 add708Error( CcDataOutputCtx*, char* );
 static void appendText( char *, const char* );
 static uint8 textIndex608( CcDataOutputCtx*, uint8 );
+static int utf8Cells( const char* );
 static void decode608Pair( CcDataOutputCtx*, uint8, uint8, uint8, CcdElemOut*, TextString* );
 static void decodePacketStart( CcDataOutputCtx*, uint8, char*, char*, char* );
 static void decodePacketData( CcDataOutputCtx*, uint8, char*, char*, TextString*, char* );
@@ -959,52 +960,53 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
                (((ccData2 >= FIRST_BASIC_CHAR) && (ccData2 <= LAST_BASIC_CHAR)) || (ccData2 == NULL_BASIC_CHAR)) ) {
 // TODO - HACK - This needs to be throttled. It is to verbose on cruddy captions...
 //        ASSERT(ctxPtr->currentChannel[ccType]);
-        if( (ccData1 != 0) && (ccData2 != 0) ) {
-            if( (strlen(Line21DecodeBasicNACharacter(ccData1)) == 1) && (strlen(Line21DecodeBasicNACharacter(ccData2)) == 1) ) {
-                len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d: \"%s%s\"", ctxPtr->currentChannel[ccType],
-                               Line21DecodeBasicNACharacter(ccData1), Line21DecodeBasicNACharacter(ccData2));
+        if( ccData1 == 0 ) {
+            // A NULL before the character is padding: the pair carries just the second byte.
+            ccData1 = ccData2;
+            ccData2 = 0;
+        }
+        const char* glyph1 = Line21DecodeBasicNACharacter(ccData1);
+        const char* glyph2 = (ccData2 != 0) ? Line21DecodeBasicNACharacter(ccData2) : "";
+        // 0x7F (a solid block) is three bytes of UTF-8 but one screen cell. Pairs with it are
+        // laid out like plain ASCII, padded by cells; the column holds the extra bytes.
+        boolean hasWideGlyph = (strlen(glyph1) > 2) || (strlen(glyph2) > 2);
+        int extraBytes = 0;
+        if( hasWideGlyph == TRUE ) {
+            extraBytes = (int)(strlen(glyph1) - utf8Cells(glyph1)) + (int)(strlen(glyph2) - utf8Cells(glyph2));
+        }
+        if( ccData2 != 0 ) {
+            if( (hasWideGlyph == TRUE) || ((strlen(glyph1) == 1) && (strlen(glyph2) == 1)) ) {
+                len = snprintf(outputPtr->tagStr, sizeof(outputPtr->tagStr), "Ch%d: \"%s%s\"", ctxPtr->currentChannel[ccType], glyph1, glyph2);
+                ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE - 1) + extraBytes);
+                len = snprintf(outputPtr->decStr, sizeof(outputPtr->decStr), "Chan-%d:  \"%s\"  \"%s\"", ctxPtr->currentChannel[ccType], glyph1, glyph2);
+                ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1) + extraBytes);
+            } else if( (strlen(glyph1) == 2) && (strlen(glyph2) == 2) ) {
+                len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d\"%s%s\"", ctxPtr->currentChannel[ccType], glyph1, glyph2);
                 ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE - 1));
-                len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Chan-%d:  \"%s\"  \"%s\"", ctxPtr->currentChannel[ccType],
-                               Line21DecodeBasicNACharacter(ccData1), Line21DecodeBasicNACharacter(ccData2));
-                ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
-            } else if( (strlen(Line21DecodeBasicNACharacter(ccData1)) == 2) && (strlen(Line21DecodeBasicNACharacter(ccData2)) == 2) ) {
-                len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d\"%s%s\"", ctxPtr->currentChannel[ccType],
-                               Line21DecodeBasicNACharacter(ccData1), Line21DecodeBasicNACharacter(ccData2));
-                ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE - 1));
-                len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Chan-%d: \"%s\" \"%s\"", ctxPtr->currentChannel[ccType],
-                               Line21DecodeBasicNACharacter(ccData1), Line21DecodeBasicNACharacter(ccData2));
-                ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
-            } else {
-                len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d \"%s%s\"", ctxPtr->currentChannel[ccType],
-                               Line21DecodeBasicNACharacter(ccData1), Line21DecodeBasicNACharacter(ccData2));
-                ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE - 1));
-                len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Chan-%d:  \"%s\" \"%s\"", ctxPtr->currentChannel[ccType],
-                               Line21DecodeBasicNACharacter(ccData1), Line21DecodeBasicNACharacter(ccData2));
-                ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
-            }
-            if( ctxPtr->currentChannel[ccType] != UNKOWN_CHANNEL ) {
-                appendText(txtStr->txtStr608[textIndex608(ctxPtr, ctxPtr->currentChannel[ccType])], Line21DecodeBasicNACharacter(ccData1));
-                appendText(txtStr->txtStr608[textIndex608(ctxPtr, ctxPtr->currentChannel[ccType])], Line21DecodeBasicNACharacter(ccData2));
-            }
-        } else if( (ccData1 != 0) && (ccData2 == 0) ) {
-            if( strlen(Line21DecodeBasicNACharacter(ccData1)) == 1 ) {
-                len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d - \"%s\"", ctxPtr->currentChannel[ccType], Line21DecodeBasicNACharacter(ccData1));
-                ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE - 1));
-                len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Channel - %d:  \"%s\"", ctxPtr->currentChannel[ccType],
-                               Line21DecodeBasicNACharacter(ccData1));
+                len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Chan-%d: \"%s\" \"%s\"", ctxPtr->currentChannel[ccType], glyph1, glyph2);
                 ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
             } else {
-                len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d: \"%s\"", ctxPtr->currentChannel[ccType], Line21DecodeBasicNACharacter(ccData1));
+                len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d \"%s%s\"", ctxPtr->currentChannel[ccType], glyph1, glyph2);
                 ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE - 1));
-                len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Channel - %d: \"%s\"", ctxPtr->currentChannel[ccType],
-                               Line21DecodeBasicNACharacter(ccData1));
+                len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Chan-%d:  \"%s\" \"%s\"", ctxPtr->currentChannel[ccType], glyph1, glyph2);
                 ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
-            }
-            if( ctxPtr->currentChannel[ccType] != UNKOWN_CHANNEL ) {
-                appendText(txtStr->txtStr608[textIndex608(ctxPtr, ctxPtr->currentChannel[ccType])], Line21DecodeBasicNACharacter(ccData1));
             }
         } else {
-            ASSERT(0);
+            if( (hasWideGlyph == TRUE) || (strlen(glyph1) == 1) ) {
+                len = snprintf(outputPtr->tagStr, sizeof(outputPtr->tagStr), "Ch%d - \"%s\"", ctxPtr->currentChannel[ccType], glyph1);
+                ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE - 1) + extraBytes);
+                len = snprintf(outputPtr->decStr, sizeof(outputPtr->decStr), "Channel - %d:  \"%s\"", ctxPtr->currentChannel[ccType], glyph1);
+                ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1) + extraBytes);
+            } else {
+                len = snprintf(outputPtr->tagStr, CC_DATA_ELEMENT_TAG_STR_SIZE, "Ch%d: \"%s\"", ctxPtr->currentChannel[ccType], glyph1);
+                ASSERT(len == (CC_DATA_ELEMENT_TAG_STR_SIZE - 1));
+                len = snprintf(outputPtr->decStr, CC_DATA_ELEMENT_DEC_STR_SIZE, "Channel - %d: \"%s\"", ctxPtr->currentChannel[ccType], glyph1);
+                ASSERT(len == (CC_DATA_ELEMENT_DEC_STR_SIZE - 1));
+            }
+        }
+        if( ctxPtr->currentChannel[ccType] != UNKOWN_CHANNEL ) {
+            appendText(txtStr->txtStr608[textIndex608(ctxPtr, ctxPtr->currentChannel[ccType])], glyph1);
+            appendText(txtStr->txtStr608[textIndex608(ctxPtr, ctxPtr->currentChannel[ccType])], glyph2);
         }
     } else {
         LOG(DEBUG_LEVEL_ERROR, DBG_CCD_OUT, "Unable to decode CC Construct: 0x%02X 0x%02X", ccData1, ccData2);
@@ -1835,6 +1837,22 @@ static uint8 textIndex608( CcDataOutputCtx* ctxPtr, uint8 channelNum ) {
     }
     return channelNum - 1;
 }  // textIndex608()
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    utf8Cells()
+ |
+ | DESCRIPTION:
+ |    This function counts the characters in a UTF-8 string, which for the
+ |    608 character sets is the number of screen cells it takes.
+ -------------------------------------------------------------------------------*/
+static int utf8Cells( const char* str ) {
+    int cells = 0;
+    for( ; *str != '\0'; str++ ) {
+        if( (*str & 0xC0) != 0x80 ) cells++;  // count every byte but continuation bytes
+    }
+    return cells;
+}  // utf8Cells()
 
 /*------------------------------------------------------------------------------
  | NAME:
