@@ -421,22 +421,22 @@ static void writeDtvccData( DtvccOutputCtx* ctxPtr, CaptionTime* captionTimePtr,
     boolean isChar = ((dtvccDataPtr->dtvccType == DTVCC_G0_CHAR) || (dtvccDataPtr->dtvccType == DTVCC_G1_CHAR) ||
                       (dtvccDataPtr->dtvccType == DTVCC_G2_CHAR) || (dtvccDataPtr->dtvccType == DTVCC_G3_CHAR));
     
-    if( (dtvccDataPtr->dtvccType == DTVCC_C0_CMD) && (ctxPtr->textStream[dtvccDataPtr->serviceNumber] == TRUE) &&
+    if( (dtvccDataPtr->dtvccType == DTVCC_C0_CMD) && (ctxPtr->textStream[fileIdx] == TRUE) &&
         (dtvccDataPtr->data.c0cmd.c0CmdCode == DTVCC_C0_ETX) && (ctxPtr->suppressEtx == TRUE) ) {
         isChar = TRUE;
     }
 
-    if( (dtvccDataPtr->dtvccType == DTVCC_C0_CMD) && (ctxPtr->textStream[dtvccDataPtr->serviceNumber] == TRUE) &&
+    if( (dtvccDataPtr->dtvccType == DTVCC_C0_CMD) && (ctxPtr->textStream[fileIdx] == TRUE) &&
         (dtvccDataPtr->data.c0cmd.c0CmdCode == DTVCC_C0_NUL) && (ctxPtr->suppressNull == TRUE) ) {
         isChar = TRUE;
     }
 
-    if( (isChar == TRUE) && (ctxPtr->textStream[dtvccDataPtr->serviceNumber] == FALSE) ) {
+    if( (isChar == TRUE) && (ctxPtr->textStream[fileIdx] == FALSE) ) {
         writeToFile(ctxPtr->fp[fileIdx], " \"");
-        ctxPtr->textStream[dtvccDataPtr->serviceNumber] = TRUE;
-    } else if( (isChar == FALSE) && (ctxPtr->textStream[dtvccDataPtr->serviceNumber] == TRUE) ) {
+        ctxPtr->textStream[fileIdx] = TRUE;
+    } else if( (isChar == FALSE) && (ctxPtr->textStream[fileIdx] == TRUE) ) {
         writeToFile(ctxPtr->fp[fileIdx], "\"");
-        ctxPtr->textStream[dtvccDataPtr->serviceNumber] = FALSE;
+        ctxPtr->textStream[fileIdx] = FALSE;
     }
     
     switch(dtvccDataPtr->dtvccType) {
@@ -449,7 +449,7 @@ static void writeDtvccData( DtvccOutputCtx* ctxPtr, CaptionTime* captionTimePtr,
                (dtvccDataPtr->data.c0cmd.c0CmdCode == DTVCC_C0_HCR) ) {
                 if( (((dtvccDataPtr->data.c0cmd.c0CmdCode != DTVCC_C0_ETX) || (ctxPtr->suppressEtx == FALSE)) &&
                      ((dtvccDataPtr->data.c0cmd.c0CmdCode != DTVCC_C0_NUL) || (ctxPtr->suppressNull == FALSE))) ||
-                    (ctxPtr->textStream[dtvccDataPtr->serviceNumber] == FALSE) ) {
+                    (ctxPtr->textStream[fileIdx] == FALSE) ) {
                     writeToFile(ctxPtr->fp[fileIdx], " {%s}", DtvccDecodeC0Cmd(dtvccDataPtr->data.c0cmd.c0CmdCode));
                 }
             } else if( dtvccDataPtr->data.c0cmd.c0CmdCode == DTVCC_C0_P16 ) {
