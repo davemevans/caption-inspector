@@ -216,6 +216,9 @@ uint8 Line21OutShutdown( void* rootCtxPtr ) {
 
     for( int loop = 0; loop < LINE21_MAX_NUM_SERVICES; loop++ ) {
         if( ctxPtr->fp[loop] != NULL ) {
+            if( ctxPtr->textStream[loop] == TRUE ) {
+                writeToFile(ctxPtr->fp[loop], "\"");
+            }
             closeFile(ctxPtr->fp[loop]);
             anyFiles = TRUE;
         }
