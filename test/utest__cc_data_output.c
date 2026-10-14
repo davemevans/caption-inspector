@@ -20,7 +20,7 @@
 /*----------------------------------------------------------------------------*/
 
 static void clearTextString( TextString* txtStr ) {
-    for( int loop = 0; loop < NUM_608_CHANNELS; loop++ ) {
+    for( int loop = 0; loop < NUM_608_SERVICES; loop++ ) {
         txtStr->txtStr608[loop][0] = '\0';
     }
     for( int loop = 0; loop < NUM_708_SERVICES; loop++ ) {
@@ -33,6 +33,18 @@ static boolean allServiceTextEmpty( TextString* txtStr ) {
         if( strlen(txtStr->txtStr708[loop]) != 0 ) return FALSE;
     }
     return TRUE;
+}
+
+static void init608Ctx( CcDataOutputCtx* ctxPtr ) {
+    ctxPtr->currentChannel[CC_DATA_TYPE__FIELD_1] = UNKOWN_CHANNEL;
+    ctxPtr->currentChannel[CC_DATA_TYPE__FIELD_2] = UNKOWN_CHANNEL;
+    ctxPtr->inXds[CC_DATA_TYPE__FIELD_1] = FALSE;
+    ctxPtr->inXds[CC_DATA_TYPE__FIELD_2] = FALSE;
+    ctxPtr->last608Pair[CC_DATA_TYPE__FIELD_1] = 0;
+    ctxPtr->last608Pair[CC_DATA_TYPE__FIELD_2] = 0;
+    for( int loop = 0; loop <= LINE21_MAX_NUM_CHANNELS; loop++ ) {
+        ctxPtr->isTextMode[loop] = FALSE;
+    }
 }
 
 /*----------------------------------------------------------------------------*/
@@ -202,6 +214,73 @@ void utest__add708Error( TEST_SUITE_RECEIVED_ARGUMENTS ) {
 }  // utest__add708Error()
 
 /*------------------------------------------------------------------------------
+ | FUNCTION UNDER TEST: decode608Pair()
+ |
+ | TEST CASES:
+ |     1) A basic pair with the solid block (0x7F, three bytes of UTF-8) keeps
+ |        whole glyphs and the column width in screen cells.
+ |     2) A NULL then a character shows and collects the character.
+ |     3) 0x14 on field 2 is a CC3 control code.
+ |     4) A Special Character before any control code sets the channel rather
+ |        than tripping an assert.
+ |     5) Text after TR is collected as T1, and after EOC as CC1 again.
+ -------------------------------------------------------------------------------*/
+void utest__decode608Pair( TEST_SUITE_RECEIVED_ARGUMENTS ) {
+    TEST_INITIALIZE
+    CcDataOutputCtx ctx;
+    CcdElemOut elem;
+    TextString txtStr;
+
+    TEST_START("Test Case: decode608Pair() - The solid block keeps its bytes and the column width.");
+    init608Ctx(&ctx);
+    clearTextString(&txtStr);
+    ctx.currentChannel[CC_DATA_TYPE__FIELD_1] = 1;
+    decode608Pair(&ctx, CC_DATA_TYPE__FIELD_1, 0xFE, 0x7F, &elem, &txtStr);
+    ASSERT_STREQ("Ch1: \"ñ■\"", elem.tagStr);
+    ASSERT_EQ(CC_DATA_ELEMENT_TAG_STR_SIZE - 1, utf8Cells(elem.tagStr));
+    ASSERT_STREQ("Chan-1:  \"ñ\"  \"■\"", elem.decStr);
+    ASSERT_EQ(CC_DATA_ELEMENT_DEC_STR_SIZE - 1, utf8Cells(elem.decStr));
+    ASSERT_STREQ("ñ■", txtStr.txtStr608[0]);
+    TEST_END
+
+    TEST_START("Test Case: decode608Pair() - A NULL then a character is that character.");
+    init608Ctx(&ctx);
+    clearTextString(&txtStr);
+    ctx.currentChannel[CC_DATA_TYPE__FIELD_1] = 1;
+    decode608Pair(&ctx, CC_DATA_TYPE__FIELD_1, 0x80, 0xC1, &elem, &txtStr);
+    ASSERT_STREQ("Ch1 - \"A\"", elem.tagStr);
+    ASSERT_STREQ("A", txtStr.txtStr608[0]);
+    TEST_END
+
+    TEST_START("Test Case: decode608Pair() - 0x14 on field 2 is a CC3 control code.");
+    init608Ctx(&ctx);
+    clearTextString(&txtStr);
+    decode608Pair(&ctx, CC_DATA_TYPE__FIELD_2, 0x94, 0x20, &elem, &txtStr);
+    ASSERT_STREQ("Ch3 {RCL}", elem.tagStr);
+    ASSERT_EQ(3, ctx.currentChannel[CC_DATA_TYPE__FIELD_2]);
+    TEST_END
+
+    TEST_START("Test Case: decode608Pair() - A Special Character sets the channel.");
+    init608Ctx(&ctx);
+    clearTextString(&txtStr);
+    decode608Pair(&ctx, CC_DATA_TYPE__FIELD_2, 0x19, 0x37, &elem, &txtStr);
+    ASSERT_EQ(4, ctx.currentChannel[CC_DATA_TYPE__FIELD_2]);
+    ASSERT_STREQ("♪", txtStr.txtStr608[3]);
+    TEST_END
+
+    TEST_START("Test Case: decode608Pair() - Text Mode text is collected as T1.");
+    init608Ctx(&ctx);
+    clearTextString(&txtStr);
+    decode608Pair(&ctx, CC_DATA_TYPE__FIELD_1, 0x94, 0x2A, &elem, &txtStr);   // TR
+    decode608Pair(&ctx, CC_DATA_TYPE__FIELD_1, 0xC1, 0xC2, &elem, &txtStr);   // "AB"
+    decode608Pair(&ctx, CC_DATA_TYPE__FIELD_1, 0x94, 0x2F, &elem, &txtStr);   // EOC
+    decode608Pair(&ctx, CC_DATA_TYPE__FIELD_1, 0x43, 0xC4, &elem, &txtStr);   // "CD"
+    ASSERT_STREQ("AB", txtStr.txtStr608[NUM_608_CHANNELS]);
+    ASSERT_STREQ("CD", txtStr.txtStr608[0]);
+    TEST_END
+}  // utest__decode608Pair()
+
+/*------------------------------------------------------------------------------
  | UNTESTED FUNCTIONS:
  |    Most of cc_data_output.c drives file output and is exercised by the
  |    integration/Python pipeline tests; this suite covers the Service Number
@@ -220,6 +299,10 @@ int main( int argc, char* argv[] ) {
 
     TEST_SUITE_START("Test Suite: cc_data_output.c -- add708Error()");
     utest__add708Error( &tmpNumSuccessfulTests, &tmpNumFailedTests );
+    TEST_SUITE_END
+
+    TEST_SUITE_START("Test Suite: cc_data_output.c -- decode608Pair()");
+    utest__decode608Pair( &tmpNumSuccessfulTests, &tmpNumFailedTests );
     TEST_SUITE_END
 
     SHUTDOWN_TEST_FRAMEWORK
