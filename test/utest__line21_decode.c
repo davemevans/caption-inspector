@@ -34,6 +34,7 @@ static void initCtx( Line21DecodeCtx* ctxPtr ) {
         ctxPtr->isPaintOnCaptioning[loop] = FALSE;
         ctxPtr->captioningChange[loop] = FALSE;
         ctxPtr->captioningStart[loop] = FALSE;
+        ctxPtr->isTextMode[loop] = FALSE;
     }
     ctxPtr->numMiscCodeFieldMismatches = 0;
 }
@@ -321,6 +322,77 @@ void utest__fieldPrefixes( TEST_SUITE_RECEIVED_ARGUMENTS ) {
 }  // utest__fieldPrefixes()
 
 /*------------------------------------------------------------------------------
+ | FUNCTION UNDER TEST: decodeCaptionData() - Text Mode
+ |
+ | TEST CASES:
+ |     1) TR starts Text Mode: it and the text and codes after it are T1, until
+ |        EOC returns the channel to captions.
+ |     2) EDM and ENM act on caption memory even in Text Mode.
+ |     3) Text Mode is per data channel: CC2 captions are not affected by T1.
+ |     4) RTD starts Text Mode on field 2, and an XDS packet ends it.
+ -------------------------------------------------------------------------------*/
+void utest__textMode( TEST_SUITE_RECEIVED_ARGUMENTS ) {
+    TEST_INITIALIZE
+    Line21DecodeCtx ctx;
+    Line21Code code;
+
+    TEST_START("Test Case: decodeCaptionData() - TR to EOC is Text Mode.");
+    initCtx(&ctx);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x14, 0x2A, &code));   // TR
+    ASSERT_EQ(TRUE, code.isText);
+    ASSERT_EQ(LINE21_CHANNEL_1, code.channelNum);
+    ASSERT_EQ(FALSE, ctx.dataFound[LINE21_CHANNEL_1]);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x41, 0x42, &code));   // "AB"
+    ASSERT_EQ(TRUE, code.isText);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x14, 0x2D, &code));   // CR
+    ASSERT_EQ(TRUE, code.isText);
+    ASSERT_EQ(FALSE, ctx.isRollUpCaptioning[LINE21_CHANNEL_1]);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x11, 0x40, &code));   // PAC
+    ASSERT_EQ(TRUE, code.isText);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x14, 0x2F, &code));   // EOC
+    ASSERT_EQ(FALSE, code.isText);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x41, 0x42, &code));
+    ASSERT_EQ(FALSE, code.isText);
+    TEST_END
+
+    TEST_START("Test Case: decodeCaptionData() - EDM and ENM act on captions in Text Mode.");
+    initCtx(&ctx);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x14, 0x2B, &code));   // RTD
+    ASSERT_EQ(TRUE, code.isText);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x14, 0x2C, &code));   // EDM
+    ASSERT_EQ(FALSE, code.isText);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x14, 0x2E, &code));   // ENM
+    ASSERT_EQ(FALSE, code.isText);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x41, 0x42, &code));
+    ASSERT_EQ(TRUE, code.isText);
+    TEST_END
+
+    TEST_START("Test Case: decodeCaptionData() - Text Mode is per data channel.");
+    initCtx(&ctx);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x14, 0x2A, &code));   // T1
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x1C, 0x20, &code));   // CC2 RCL
+    ASSERT_EQ(FALSE, code.isText);
+    ASSERT_EQ(LINE21_CHANNEL_2, code.channelNum);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x41, 0x42, &code));
+    ASSERT_EQ(LINE21_CHANNEL_2, code.channelNum);
+    ASSERT_EQ(FALSE, code.isText);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x14, 0x2D, &code));   // T1 CR
+    ASSERT_EQ(TRUE, code.isText);
+    TEST_END
+
+    TEST_START("Test Case: decodeCaptionData() - An XDS packet ends Text Mode on field 2.");
+    initCtx(&ctx);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x15, 0x2B, &code));   // T3 RTD
+    ASSERT_EQ(TRUE, code.isText);
+    ASSERT_EQ(LINE21_CHANNEL_3, code.channelNum);
+    ASSERT_EQ(TRUE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x01));
+    ASSERT_EQ(TRUE, isXdsPair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x0F));
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x41, 0x42, &code));
+    ASSERT_EQ(FALSE, code.isText);
+    TEST_END
+}  // utest__textMode()
+
+/*------------------------------------------------------------------------------
  | UNTESTED FUNCTIONS:
  |    Line21DecodeProcNextBuffer() and the captioning-style bookkeeping are
  |    exercised by the integration/Python pipeline tests.
@@ -346,6 +418,10 @@ int main( int argc, char* argv[] ) {
 
     TEST_SUITE_START("Test Suite: line21_decode.c -- Field Prefixes");
     utest__fieldPrefixes( &tmpNumSuccessfulTests, &tmpNumFailedTests );
+    TEST_SUITE_END
+
+    TEST_SUITE_START("Test Suite: line21_decode.c -- Text Mode");
+    utest__textMode( &tmpNumSuccessfulTests, &tmpNumFailedTests );
     TEST_SUITE_END
 
     SHUTDOWN_TEST_FRAMEWORK

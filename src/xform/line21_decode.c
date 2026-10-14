@@ -88,6 +88,7 @@ LinkInfo Line21DecodeInitialize( Context* rootCtxPtr, boolean processOnly ) {
         ctxPtr->isPaintOnCaptioning[loop] = FALSE;
         ctxPtr->captioningChange[loop] = FALSE;
         ctxPtr->captioningStart[loop] = FALSE;
+        ctxPtr->isTextMode[loop] = FALSE;
     }
     ctxPtr->numMiscCodeFieldMismatches = 0;
 
@@ -409,6 +410,9 @@ static boolean isXdsPair( Line21DecodeCtx* ctxPtr, uint8 fieldNum, uint8 firstBy
 
     if( (firstByte >= XDS_CTRL_FIRST) && (firstByte <= XDS_CTRL_END) ) {
         ctxPtr->inXds[fieldNum] = (firstByte != XDS_CTRL_END);
+        // An XDS control byte also ends Text Mode on field 2 (CTA-608-E 7).
+        ctxPtr->isTextMode[LINE21_CHANNEL_3] = FALSE;
+        ctxPtr->isTextMode[LINE21_CHANNEL_4] = FALSE;
         return TRUE;
     }
 
@@ -451,6 +455,7 @@ static boolean decodeCaptionData( Line21DecodeCtx* ctxPtr, uint8 firstByte, uint
 
     firstByte = firstByte & LINE_21_PARITY_MASK;
     secondByte = secondByte & LINE_21_PARITY_MASK;
+    codePtr->isText = FALSE;
 
     // Each decoder checks both bytes against its exact range. PACs are tried
     // after the other control codes and characters because they share the
@@ -463,6 +468,10 @@ static boolean decodeCaptionData( Line21DecodeCtx* ctxPtr, uint8 firstByte, uint
     if (wasDecoded == FALSE) wasDecoded = decodePAC(ctxPtr, firstByte, secondByte, codePtr);
     if (wasDecoded == FALSE) wasDecoded = decodeBasicChars(ctxPtr, firstByte, secondByte, codePtr, captionTimePtr);
 
+    if( (wasDecoded == TRUE) && (codePtr->codeType != LINE21_GLOBAL_CONTROL_CODE) ) {
+        // Global control codes choose the mode themselves, in decodeGlobalCmd().
+        codePtr->isText = ctxPtr->isTextMode[codePtr->channelNum];
+    }
     return wasDecoded;
 }  // decodeCaptionData()
 
@@ -511,6 +520,21 @@ static boolean decodeGlobalCmd( Line21DecodeCtx* ctxPtr, uint8 ccData1, uint8 cc
     }
 
     codePtr->code.globalControl.cmd = ccData2;
+
+    // TR and RTD switch the data channel to Text Mode (T1-T4), and only the caption mode
+    // codes switch it back. EDM and ENM always act on caption memory (CTA-608-E 7).
+    if( (ccData2 == GLOBAL_CTRL_CODE__TR) || (ccData2 == GLOBAL_CTRL_CODE__RTD) ) {
+        ctxPtr->isTextMode[codePtr->channelNum] = TRUE;
+    } else if( (ccData2 == GLOBAL_CTRL_CODE__RCL) || (ccData2 == GLOBAL_CTRL_CODE__RDC) || (ccData2 == GLOBAL_CTRL_CODE__EOC) ||
+               (ccData2 == GLOBAL_CTRL_CODE__RU2) || (ccData2 == GLOBAL_CTRL_CODE__RU3) || (ccData2 == GLOBAL_CTRL_CODE__RU4) ) {
+        ctxPtr->isTextMode[codePtr->channelNum] = FALSE;
+    }
+    if( (ccData2 != GLOBAL_CTRL_CODE__EDM) && (ccData2 != GLOBAL_CTRL_CODE__ENM) ) {
+        codePtr->isText = ctxPtr->isTextMode[codePtr->channelNum];
+    }
+    if( codePtr->isText == TRUE ) {
+        return TRUE;
+    }
     ctxPtr->dataFound[codePtr->channelNum] = TRUE;
 
     if( (ccData2 == GLOBAL_CTRL_CODE__RCL) || (ccData2 == GLOBAL_CTRL_CODE__EOC) ) {

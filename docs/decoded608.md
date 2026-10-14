@@ -7,6 +7,11 @@ to the end of the filename. This happens as a result of finding 'any' captions f
 necessarily indicate that a specific channel is a valid channel with captions. Sometimes it is just random garbage
 that is in the captioning and decodes as data for a specific channel which was not intended to have captions.
 
+Caption channels CC1-CC4 are written to `-C1.608` to `-C4.608`. Text Mode services T1-T4 share those data channels:
+after a Text Restart `{TR}` or Resume Text Display `{RTD}`, a channel's data is written to `-T1.608` to `-T4.608`
+until a caption code (`{RCL}`, `{RDC}`, `{RU2}`-`{RU4}` or `{EOC}`) returns it to captions. `{EDM}` and `{ENM}` always
+act on caption memory, so they stay in the caption file. On field 2 an XDS packet also ends Text Mode.
+
 Field 2 caption control codes should use the first bytes 0x15/0x1D, but some encoders send the field 1 bytes 0x14/0x1C
 there too. The field decides the channel, so these are decoded as CC3/CC4, with a warning in the debug log.
 
