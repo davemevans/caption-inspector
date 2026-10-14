@@ -40,4 +40,4 @@ Decoded DTVCC / CEA-708 for Asset: ./tmp/BigBuckBunny_256x144-24fps-S3.708 - Ser
 00:00:26,067 - {DLW:00000100} {DF2:PopUp-Cntrd:R0-C41:Anchor-UL-V70-H80:Pen-MonoSerif:Pr-0} {SWA:Fill-Transparent-R1G1B1:Brdr-None-R1G1B1:PD-LtoR:SD-LtoR:JD-LtoR:Snap-1.0sec-LtoR} {SPL:R0-C0} {SPA:Pen-[Size:Standard,Offset:Normal]:TextTag-Dialog:FontTag-Default:EdgeType-None} {SPC:FG-Solid-R2G2B2:BG-Solid-R0G0B0:Edg-R1G1B1} "QUE ÇA."
 00:00:26,443 - {HDW:11111111}
 00:00:26,651 - {TGW:00000101}
-00:00:26,860 - {DLW:00000010} {DF1:PopUp-Cntrd:R0-C41:Anchor-UL-V70-H55:Pen-MonoSerif:Pr-0} {SWA:Fill-Transparent-R1G1B1:Brdr-None-R1G1B1:PD-LtoR:SD-LtoR:JD-LtoR:Snap-1.0sec-LtoR} {SPL:R0-C0} {SPA:Pen-[Size:Standard,Offset:Normal]:TextTag-Dialog:FontTag-Default:EdgeType-None} {SPC:FG-Solid-R2G2B2:BG-Solid-R0G0B0:Edg-R1G1B1} "[historique]
+00:00:26,860 - {DLW:00000010} {DF1:PopUp-Cntrd:R0-C41:Anchor-UL-V70-H55:Pen-MonoSerif:Pr-0} {SWA:Fill-Transparent-R1G1B1:Brdr-None-R1G1B1:PD-LtoR:SD-LtoR:JD-LtoR:Snap-1.0sec-LtoR} {SPL:R0-C0} {SPA:Pen-[Size:Standard,Offset:Normal]:TextTag-Dialog:FontTag-Default:EdgeType-None} {SPC:FG-Solid-R2G2B2:BG-Solid-R0G0B0:Edg-R1G1B1} "[historique]"
