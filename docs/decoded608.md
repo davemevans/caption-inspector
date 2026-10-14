@@ -7,6 +7,9 @@ to the end of the filename. This happens as a result of finding 'any' captions f
 necessarily indicate that a specific channel is a valid channel with captions. Sometimes it is just random garbage
 that is in the captioning and decodes as data for a specific channel which was not intended to have captions.
 
+Field 2 caption control codes should use the first bytes 0x15/0x1D, but some encoders send the field 1 bytes 0x14/0x1C
+there too. The field decides the channel, so these are decoded as CC3/CC4, with a warning in the debug log.
+
 Here is an example of a Decoded CEA-608 file that was produced by Caption Inspector, followed by a description of the
 different elements in the file.
 

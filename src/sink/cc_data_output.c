@@ -442,29 +442,15 @@ static void decode608Pair( CcDataOutputCtx* ctxPtr, uint8 ccType, uint8 ccData1,
     } else if( ((ccData1 == GLOBAL_CTRL_CODE_CC1) || (ccData1 == GLOBAL_CTRL_CODE_CC2) ||
                 (ccData1 == GLOBAL_CTRL_CODE_CC3) || (ccData1 == GLOBAL_CTRL_CODE_CC4)) &&
                ((ccData2 & GLOBAL_CTRL_CMD_MASK) == ccData2) && (ccData2 >= GLOBAL_CTRL_CMD_NORMALIZATION) ) {
-        switch( ccData1 ) {
-            case GLOBAL_CTRL_CODE_CC1:
-                channelNum = 1;
-                break;
-            case GLOBAL_CTRL_CODE_CC2:
-                channelNum = 2;
-                break;
-            case GLOBAL_CTRL_CODE_CC3:
-                channelNum = 3;
-                break;
-            case GLOBAL_CTRL_CODE_CC4:
-                channelNum = 4;
-                break;
-            default:
-                ASSERT(0);
-                break;
+        // The field picks CC1/CC2 or CC3/CC4, even when field 2 uses the field 1 prefix 0x14/0x1C.
+        boolean isDataChannel2 = ((ccData1 == GLOBAL_CTRL_CODE_CC2) || (ccData1 == GLOBAL_CTRL_CODE_CC4));
+        if( ccType == CC_DATA_TYPE__FIELD_1 ) {
+            channelNum = (isDataChannel2 == TRUE) ? 2 : 1;
+        } else {
+            channelNum = (isDataChannel2 == TRUE) ? 4 : 3;
         }
-
-        if( ((channelNum == 1) && (ccType == CC_DATA_TYPE__FIELD_2)) ||
-            ((channelNum == 2) && (ccType == CC_DATA_TYPE__FIELD_2)) ||
-            ((channelNum == 3) && (ccType == CC_DATA_TYPE__FIELD_1)) ||
-            ((channelNum == 4) && (ccType == CC_DATA_TYPE__FIELD_1)) ) {
-            LOG(DEBUG_LEVEL_ERROR, DBG_CCD_OUT, "Channel/Field Mismatch: Chan - %d Field - %s Code - %s", channelNum, ccTypeStr[ccType], Line21GlobalCtrlCodeToString(ccData2));
+        if( (ccType == CC_DATA_TYPE__FIELD_1) != ((ccData1 == GLOBAL_CTRL_CODE_CC1) || (ccData1 == GLOBAL_CTRL_CODE_CC2)) ) {
+            LOG(DEBUG_LEVEL_VERBOSE, DBG_CCD_OUT, "Control code prefix 0x%02X on Field %s, decoded as Chan - %d", ccData1, ccTypeStr[ccType], channelNum);
         }
 
         ctxPtr->currentChannel[ccType] = channelNum;

@@ -35,11 +35,13 @@ static void initCtx( Line21DecodeCtx* ctxPtr ) {
         ctxPtr->captioningChange[loop] = FALSE;
         ctxPtr->captioningStart[loop] = FALSE;
     }
+    ctxPtr->numMiscCodeFieldMismatches = 0;
 }
 
 // Decodes one pair (parity already stripped) on the given field.
 static boolean decodePair( Line21DecodeCtx* ctxPtr, uint8 field, uint8 byte1, uint8 byte2, Line21Code* codePtr ) {
     CaptionTime captionTime = { 0 };
+    captionTime.source = CAPTION_TIME_PTS_NUMBERING;  // control codes log the time they start a mode
     codePtr->fieldNum = field;
     codePtr->codeType = LINE21_CODE_TYPE_UNKNOWN;
     return decodeCaptionData(ctxPtr, byte1, byte2, codePtr, &captionTime);
@@ -275,6 +277,50 @@ void utest__redundantPairs( TEST_SUITE_RECEIVED_ARGUMENTS ) {
 }  // utest__redundantPairs()
 
 /*------------------------------------------------------------------------------
+ | FUNCTION UNDER TEST: decodeGlobalCmd() - Field 1 and field 2 prefixes
+ |
+ | TEST CASES:
+ |     1) 0x15 and 0x1D on field 2 are CC3 and CC4.
+ |     2) 0x14 and 0x1C on field 2 (the field 1 prefix) are still CC3 and CC4,
+ |        are counted, and the text after them goes to CC3.
+ |     3) 0x15 on field 1 is CC1.
+ -------------------------------------------------------------------------------*/
+void utest__fieldPrefixes( TEST_SUITE_RECEIVED_ARGUMENTS ) {
+    TEST_INITIALIZE
+    Line21DecodeCtx ctx;
+    Line21Code code;
+
+    TEST_START("Test Case: decodeGlobalCmd() - 0x15 and 0x1D on field 2 are CC3 and CC4.");
+    initCtx(&ctx);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x15, 0x20, &code));
+    ASSERT_EQ(LINE21_CHANNEL_3, code.channelNum);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x1D, 0x20, &code));
+    ASSERT_EQ(LINE21_CHANNEL_4, code.channelNum);
+    ASSERT_EQ(0, ctx.numMiscCodeFieldMismatches);
+    TEST_END
+
+    TEST_START("Test Case: decodeGlobalCmd() - 0x14 and 0x1C on field 2 are CC3 and CC4.");
+    initCtx(&ctx);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x1C, 0x20, &code));
+    ASSERT_EQ(LINE21_CHANNEL_4, code.channelNum);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x14, 0x20, &code));
+    ASSERT_EQ(LINE21_CHANNEL_3, code.channelNum);
+    ASSERT_EQ(LINE21_CHANNEL_3, code.code.globalControl.chan);
+    ASSERT_EQ(2, ctx.numMiscCodeFieldMismatches);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_2_CC, 0x41, 0x42, &code));
+    ASSERT_EQ(LINE21_BASIC_CHARS, code.codeType);
+    ASSERT_EQ(LINE21_CHANNEL_3, code.channelNum);
+    TEST_END
+
+    TEST_START("Test Case: decodeGlobalCmd() - 0x15 on field 1 is CC1.");
+    initCtx(&ctx);
+    ASSERT_EQ(TRUE, decodePair(&ctx, CEA608E_LINE21_FIELD_1_CC, 0x15, 0x2F, &code));
+    ASSERT_EQ(LINE21_CHANNEL_1, code.channelNum);
+    ASSERT_EQ(1, ctx.numMiscCodeFieldMismatches);
+    TEST_END
+}  // utest__fieldPrefixes()
+
+/*------------------------------------------------------------------------------
  | UNTESTED FUNCTIONS:
  |    Line21DecodeProcNextBuffer() and the captioning-style bookkeeping are
  |    exercised by the integration/Python pipeline tests.
@@ -296,6 +342,10 @@ int main( int argc, char* argv[] ) {
 
     TEST_SUITE_START("Test Suite: line21_decode.c -- Redundant Pairs");
     utest__redundantPairs( &tmpNumSuccessfulTests, &tmpNumFailedTests );
+    TEST_SUITE_END
+
+    TEST_SUITE_START("Test Suite: line21_decode.c -- Field Prefixes");
+    utest__fieldPrefixes( &tmpNumSuccessfulTests, &tmpNumFailedTests );
     TEST_SUITE_END
 
     SHUTDOWN_TEST_FRAMEWORK
