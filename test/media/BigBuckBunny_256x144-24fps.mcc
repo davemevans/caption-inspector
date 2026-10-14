@@ -14,7 +14,7 @@ File Format=MacCaption_MCC V1.0
 //       and concludes with the Check Sum following the User Data Words.
 //     Each time code line must contain at most one complete ancillary data packet.
 //     To transfer additional ANC Data successive lines may contain identical time code.
-//     Time Code Rate=[24, 25, 30, 30DF, 50, 60, 60DF]
+//     Time Code Rate=[24, 25, 30, 30DF, 50, 60]
 //
 //   ANC data bytes may be represented by one ASCII character according to the following schema:
 //     G  FAh 00h 00h

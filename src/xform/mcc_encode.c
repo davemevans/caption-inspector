@@ -54,6 +54,7 @@ static boolean sendMccText( Context*, char*, CaptionTime* );
 static Buffer* addBoilerplate( MccEncodeCtx*, Buffer* );
 static uint16 countChars( uint8*, uint16 );
 static void compressData( uint8*, uint16, Buffer* );
+static uint8 dropFramesPerMinute( uint32 );
 
 /*----------------------------------------------------------------------------*/
 /*--                       Public Member Functions                          --*/
@@ -88,6 +89,7 @@ LinkInfo MccEncodeInitialize( Context* rootCtxPtr ) {
     ctxPtr->matchPtsTime = rootCtxPtr->config.matchPtsTime;
     ctxPtr->headerPrinted = FALSE;
     ctxPtr->cdpHeaderSequence = 0;
+    ctxPtr->dropframe = FALSE;
     ctxPtr->numFillFrames = 0;
     ctxPtr->maxPositiveDelta = 0;
     ctxPtr->maxNegativeDelta = 0;
@@ -161,6 +163,15 @@ uint8 MccEncodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
     MccEncodeCtx* ctxPtr = ((Context*)rootCtxPtr)->mccEncodeCtxPtr;
 
     if( ctxPtr->headerPrinted == FALSE ) {
+        // MCC's Time Code Rate has no value for 29.97 or 59.94 non-drop-frame ("30" and "60"
+        // mean exactly 30 and 60 fps), so those rates are always written as drop-frame, as
+        // FFmpeg does. Labels are converted, so each packet keeps its frame.
+        uint32 frameRate = inBuffer->captionTime.frameRatePerSecTimesOneHundred;
+        ctxPtr->dropframe = ((frameRate == 2997) || (frameRate == 5994)) ? TRUE : FALSE;
+        if( (ctxPtr->dropframe == TRUE) && (inBuffer->captionTime.dropframe == FALSE) ) {
+            LOG(DEBUG_LEVEL_WARN, DBG_MCC_ENC, "MCC has no Time Code Rate for %d.%02d fps non-drop-frame; writing drop-frame timecode",
+                frameRate / 100, frameRate % 100);
+        }
         LOG(DEBUG_LEVEL_VERBOSE, DBG_MCC_ENC, "Sending MCC Header.");
         if( generateMccHeader(rootCtxPtr, &inBuffer->captionTime) == FALSE ) {
             return FALSE;
@@ -181,6 +192,10 @@ uint8 MccEncodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
             frameNumber = inBuffer->captionTime.frameRatePerSecTimesOneHundred / 100;
         }
         ctxPtr->nextCaptionTime.frame = frameNumber;
+        if( (ctxPtr->dropframe == TRUE) && (ctxPtr->nextCaptionTime.second == 0) &&
+            ((ctxPtr->nextCaptionTime.minute % 10) != 0) && (ctxPtr->nextCaptionTime.frame < dropFramesPerMinute(frameRate)) ) {
+            ctxPtr->nextCaptionTime.frame = dropFramesPerMinute(frameRate);  // that label is skipped in drop-frame
+        }
         LOG(DEBUG_LEVEL_INFO, DBG_MCC_ENC, "Captions start at: %02d:%02d:%02d:%02d / %02d:%02d:%02d,%03d",
             inBuffer->captionTime.hour, inBuffer->captionTime.minute, inBuffer->captionTime.second, frameNumber,
             inBuffer->captionTime.hour, inBuffer->captionTime.minute, inBuffer->captionTime.second, inBuffer->captionTime.millisecond);
@@ -192,6 +207,10 @@ uint8 MccEncodeProcNextBuffer( void* rootCtxPtr, Buffer* inBuffer ) {
     Buffer* withBoilerPlateBuffer = addBoilerplate(ctxPtr, inBuffer);
     if( inBuffer->captionTime.source == CAPTION_TIME_PTS_NUMBERING ) {
         withBoilerPlateBuffer->captionTime = convertCaptionTime(rootCtxPtr, inBuffer);
+    } else if( inBuffer->captionTime.dropframe != ctxPtr->dropframe ) {
+        // Relabel the same frame in the timecode the file is written in.
+        frameToTimeCode( timeCodeToFrame(&inBuffer->captionTime), inBuffer->captionTime.frameRatePerSecTimesOneHundred,
+                         ctxPtr->dropframe, &withBoilerPlateBuffer->captionTime );
     } else {
         withBoilerPlateBuffer->captionTime = inBuffer->captionTime;
     }
@@ -286,6 +305,7 @@ uint8 MccEncodeShutdown( void* rootCtxPtr ) {
  |    to the next component in the pipeline.
  -------------------------------------------------------------------------------*/
 static boolean generateMccHeader( Context* ctxPtr, CaptionTime* captionTimePtr ) {
+    boolean dropframe = ctxPtr->mccEncodeCtxPtr->dropframe;
     uuid_t binuuid;
     char uuidStr[50];
     char dateStr[50];
@@ -312,7 +332,7 @@ static boolean generateMccHeader( Context* ctxPtr, CaptionTime* captionTimePtr )
             sprintf(tcrString, "Time Code Rate=25\n");
             break;
         case CC_COUNT_FRAME_RATE_30:
-            if( captionTimePtr->dropframe == TRUE ) {
+            if( dropframe == TRUE ) {
                 sprintf(tcrString, "Time Code Rate=30DF\n");
             } else {
                 sprintf(tcrString, "Time Code Rate=30\n");
@@ -322,7 +342,7 @@ static boolean generateMccHeader( Context* ctxPtr, CaptionTime* captionTimePtr )
             sprintf(tcrString, "Time Code Rate=50\n");
             break;
         case CC_COUNT_FRAME_RATE_60:
-            if( captionTimePtr->dropframe == TRUE ) {
+            if( dropframe == TRUE ) {
                 sprintf(tcrString, "Time Code Rate=60DF\n");
             } else {
                 sprintf(tcrString, "Time Code Rate=60\n");
@@ -332,7 +352,9 @@ static boolean generateMccHeader( Context* ctxPtr, CaptionTime* captionTimePtr )
             break;
     }
     
-    if( sendMccText(ctxPtr, "File Format=MacCaption_MCC V1.0\n", captionTimePtr) == FALSE ) return FALSE;
+    // MCC 1.0 has no 60DF Time Code Rate; it was added in 2.0, which uses the same line format.
+    boolean isVersion2 = ((dropframe == TRUE) && (numCcConstructsFromFramerate(captionTimePtr->frameRatePerSecTimesOneHundred) == CC_COUNT_FRAME_RATE_60));
+    if( sendMccText(ctxPtr, isVersion2 ? "File Format=MacCaption_MCC V2.0\n" : "File Format=MacCaption_MCC V1.0\n", captionTimePtr) == FALSE ) return FALSE;
     if( sendMccText(ctxPtr, "///////////////////////////////////////////////////////////////////////////////////", captionTimePtr) == FALSE ) return FALSE;
     if( sendMccText(ctxPtr, "// Telestream, LLC", captionTimePtr) == FALSE ) return FALSE;
     if( sendMccText(ctxPtr, "// Ancillary Data Packet Transfer File", captionTimePtr) == FALSE ) return FALSE;
@@ -345,7 +367,7 @@ static boolean generateMccHeader( Context* ctxPtr, CaptionTime* captionTimePtr )
     if( sendMccText(ctxPtr, "//       and concludes with the Check Sum following the User Data Words.", captionTimePtr) == FALSE ) return FALSE;
     if( sendMccText(ctxPtr, "//     Each time code line must contain at most one complete ancillary data packet.", captionTimePtr) == FALSE ) return FALSE;
     if( sendMccText(ctxPtr, "//     To transfer additional ANC Data successive lines may contain identical time code.", captionTimePtr) == FALSE ) return FALSE;
-    if( sendMccText(ctxPtr, "//     Time Code Rate=[24, 25, 30, 30DF, 50, 60, 60DF]\n//", captionTimePtr) == FALSE ) return FALSE;
+    if( sendMccText(ctxPtr, isVersion2 ? "//     Time Code Rate=[24, 25, 30, 30DF, 50, 60, 60DF]\n//" : "//     Time Code Rate=[24, 25, 30, 30DF, 50, 60]\n//", captionTimePtr) == FALSE ) return FALSE;
     if( sendMccText(ctxPtr, "//   ANC data bytes may be represented by one ASCII character according to the following schema:", captionTimePtr) == FALSE ) return FALSE;
     if( sendMccText(ctxPtr, "//     G  FAh 00h 00h", captionTimePtr) == FALSE ) return FALSE;
     if( sendMccText(ctxPtr, "//     H  2 x (FAh 00h 00h)", captionTimePtr) == FALSE ) return FALSE;
@@ -548,7 +570,7 @@ static CaptionTime convertCaptionTime( Context* rootCtxPtr, Buffer* inBufferPtr 
 
     while( timeSynch == FALSE ) {
         captionTime.frameRatePerSecTimesOneHundred = inCaptionTimePtr->frameRatePerSecTimesOneHundred;
-        captionTime.dropframe = inCaptionTimePtr->dropframe;
+        captionTime.dropframe = ctxPtr->dropframe;
 
         captionTime.hour = ctxPtr->nextCaptionTime.hour;
         captionTime.minute = ctxPtr->nextCaptionTime.minute;
@@ -579,7 +601,8 @@ static CaptionTime convertCaptionTime( Context* rootCtxPtr, Buffer* inBufferPtr 
 
         if( (captionTime.dropframe == TRUE) && (ctxPtr->nextCaptionTime.second == 0) &&
             (ctxPtr->nextCaptionTime.frame == 0) && ((ctxPtr->nextCaptionTime.minute % 10) != 0) ){
-            ctxPtr->nextCaptionTime.frame = 2;
+            // Drop-frame skips labels 0-1 at 29.97 and 0-3 at 59.94.
+            ctxPtr->nextCaptionTime.frame = dropFramesPerMinute(captionTime.frameRatePerSecTimesOneHundred);
         }
 
         actualTimeInMs = (((inCaptionTimePtr->hour * 3600) + (inCaptionTimePtr->minute * 60) +
@@ -1039,3 +1062,15 @@ static void compressData( uint8* dataPtr, uint16 numElements, Buffer* outBufPtr 
     outBufPtr->numElements = outBufPtr->numElements + 1;
     ASSERT(outBufPtr->numElements == outBufPtr->maxNumElements);
 } // compressData()
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    dropFramesPerMinute()
+ |
+ | DESCRIPTION:
+ |    The number of frame labels drop-frame timecode skips at the start of most
+ |    minutes: 4 at 59.94 and 2 at 29.97.
+ -------------------------------------------------------------------------------*/
+static uint8 dropFramesPerMinute( uint32 frameRatePerSecTimesOneHundred ) {
+    return (frameRatePerSecTimesOneHundred > 3000) ? 4 : 2;
+}  // dropFramesPerMinute()

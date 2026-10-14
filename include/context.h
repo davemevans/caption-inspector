@@ -202,6 +202,7 @@ typedef struct {
     boolean matchPtsTime;
     boolean headerPrinted;
     uint16 cdpHeaderSequence;
+    boolean dropframe;                          // timecode labels are drop-frame (29.97 / 59.94)
     CaptionTime nextCaptionTime;
     CaptionTime lastCaptionTime;
     uint32 numFillFrames;
