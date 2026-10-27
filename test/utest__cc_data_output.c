@@ -387,6 +387,29 @@ void utest__glyphLayout( TEST_SUITE_RECEIVED_ARGUMENTS ) {
 }  // utest__glyphLayout()
 
 /*------------------------------------------------------------------------------
+ | FUNCTION UNDER TEST: DtvccDecodeG1CharSet()
+ |
+ | TEST CASES:
+ |     1) G1 is ISO 8859-1: the currency signs are the Latin-1 characters, not
+ |        their fullwidth forms, and 0xF6-0xFA are not shifted by one.
+ -------------------------------------------------------------------------------*/
+void utest__g1CharSet( TEST_SUITE_RECEIVED_ARGUMENTS ) {
+    TEST_INITIALIZE
+
+    TEST_START("Test Case: DtvccDecodeG1CharSet() - G1 matches Latin-1.");
+    ASSERT_STREQ("¢", (char*)DtvccDecodeG1CharSet(0xA2));
+    ASSERT_STREQ("£", (char*)DtvccDecodeG1CharSet(0xA3));
+    ASSERT_STREQ("¥", (char*)DtvccDecodeG1CharSet(0xA5));
+    ASSERT_STREQ("¬", (char*)DtvccDecodeG1CharSet(0xAC));
+    ASSERT_STREQ("¯", (char*)DtvccDecodeG1CharSet(0xAF));
+    ASSERT_STREQ("ö", (char*)DtvccDecodeG1CharSet(0xF6));
+    ASSERT_STREQ("÷", (char*)DtvccDecodeG1CharSet(0xF7));
+    ASSERT_STREQ("ú", (char*)DtvccDecodeG1CharSet(0xFA));
+    ASSERT_STREQ("ÿ", (char*)DtvccDecodeG1CharSet(0xFF));
+    TEST_END
+}  // utest__g1CharSet()
+
+/*------------------------------------------------------------------------------
  | UNTESTED FUNCTIONS:
  |    Most of cc_data_output.c drives file output and is exercised by the
  |    integration/Python pipeline tests; this suite covers the Service Number
@@ -421,6 +444,10 @@ int main( int argc, char* argv[] ) {
 
     TEST_SUITE_START("Test Suite: cc_data_output.c -- Glyph Layout");
     utest__glyphLayout( &tmpNumSuccessfulTests, &tmpNumFailedTests );
+    TEST_SUITE_END
+
+    TEST_SUITE_START("Test Suite: cc_data_output.c -- G1 Characters");
+    utest__g1CharSet( &tmpNumSuccessfulTests, &tmpNumFailedTests );
     TEST_SUITE_END
 
     SHUTDOWN_TEST_FRAMEWORK
