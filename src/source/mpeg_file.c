@@ -43,6 +43,7 @@
 #ifndef DONT_COMPILE_FFMPEG
 static void loggingCallback( void*, int, const char*, va_list );
 static void cleanupFFmpeg( MpegFileCtx* );
+static void trackTimestamp( MpegFileCtx*, int64 );
 #endif
 
 /*----------------------------------------------------------------------------*/
@@ -85,6 +86,9 @@ boolean MpegFileInitialize( Context* rootCtxPtr, uint8 bailAfterMins ) {
 
     // 0 is a normal first PTS (e.g. MP4), so "not yet known" is AV_NOPTS_VALUE.
     ctxPtr->firstPts = AV_NOPTS_VALUE;
+    ctxPtr->lastPts = AV_NOPTS_VALUE;
+    ctxPtr->ptsOffset = 0;
+    ctxPtr->numDiscontinuities = 0;
     ctxPtr->ccCountMismatchErrors = 0;
     ctxPtr->numRejectedPackets = 0;
 
@@ -384,6 +388,9 @@ uint8 MpegFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
             if( ctxPtr->numRejectedPackets > 1 ) {
                 LOG(DEBUG_LEVEL_WARN, DBG_MPEG_FILE, "Decoder rejected %d further packets", ctxPtr->numRejectedPackets - 1);
             }
+            if( ctxPtr->numDiscontinuities > 1 ) {
+                LOG(DEBUG_LEVEL_WARN, DBG_MPEG_FILE, "Found %d further timestamp discontinuities", ctxPtr->numDiscontinuities - 1);
+            }
             Sinks sinks = ctxPtr->sinks;
             cleanupFFmpeg(ctxPtr);
             free(ctxPtr);
@@ -395,6 +402,10 @@ uint8 MpegFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
         }
 
         // retval == 0: a decoded frame is available in ctxPtr->frame.
+        if( ctxPtr->frame->best_effort_timestamp != AV_NOPTS_VALUE ) {
+            trackTimestamp(ctxPtr, ctxPtr->frame->best_effort_timestamp);
+        }
+
         for( int i = 0; i < ctxPtr->frame->nb_side_data; i++ ) {
             if(ctxPtr->frame->side_data[i]->type == AV_FRAME_DATA_A53_CC) {
                 ctxPtr->frame->pts = ctxPtr->frame->best_effort_timestamp;
@@ -408,16 +419,11 @@ uint8 MpegFileProcNextBuffer( Context* rootCtxPtr, boolean* isDonePtr ) {
                     ctxPtr->firstPts = ctxPtr->frame->pts;
                 }
 
-                // MPEG-TS PTS is a 33-bit value on a 90 kHz clock, so it wraps
-                // every ~26.5 hours. A wrap makes (pts - firstPts) jump hugely
-                // negative; add one wrap period back to keep the timeline
-                // continuous. The half-range threshold ensures we only correct a
-                // real wrap; any other negative delta (a frame before the reported
-                // start time) is clamped to the start.
-                int64 ptsDelta = ctxPtr->frame->pts - ctxPtr->firstPts;
-                if( ptsDelta < -(1LL << 32) ) {
-                    ptsDelta += (1LL << 33);
-                } else if( ptsDelta < 0 ) {
+                // ptsOffset carries the timeline across discontinuities, including
+                // a 33-bit PTS wrap, so (pts - firstPts) is elapsed time. A frame
+                // before the reported start time is clamped to the start.
+                int64 ptsDelta = ctxPtr->frame->pts + ctxPtr->ptsOffset - ctxPtr->firstPts;
+                if( ptsDelta < 0 ) {
                     ptsDelta = 0;
                 }
 
@@ -542,4 +548,41 @@ static void cleanupFFmpeg( MpegFileCtx* ctxPtr ) {
     if( ctxPtr->decoderContext != NULL ) avcodec_free_context(&ctxPtr->decoderContext);
     if( ctxPtr->formatContext != NULL ) avformat_close_input(&ctxPtr->formatContext);
 }  // cleanupFFmpeg()
+
+/*------------------------------------------------------------------------------
+ | NAME:
+ |    trackTimestamp()
+ |
+ | INPUT PARAMETERS:
+ |    ctxPtr - Pointer to the MPEG File Context
+ |    framePts - Timestamp of the frame just decoded, in stream time base
+ |
+ | DESCRIPTION:
+ |    This function watches the decoded frames for a timestamp discontinuity: a
+ |    splice, an encoder restart or a looped playout. FFmpeg reads a jump back
+ |    in time as a 33-bit wrap and adds ~26.5 hours, so a short step back shows
+ |    up as a jump of a day forward. Either way, the timeline is carried on from
+ |    the previous frame, so caption times stay elapsed playback time.
+ -------------------------------------------------------------------------------*/
+static void trackTimestamp( MpegFileCtx* ctxPtr, int64 framePts ) {
+    AVRational timeBase = ctxPtr->formatContext->streams[ctxPtr->streamIndex]->time_base;
+
+    if( ctxPtr->lastPts != AV_NOPTS_VALUE ) {
+        int64 step = framePts - ctxPtr->lastPts;
+        int64 maxStep = av_rescale_q(MAX_TIMESTAMP_STEP_SECS, (AVRational){1, 1}, timeBase);
+        if( (step < 0) || (step > maxStep) ) {
+            int64 frameDuration = 0;
+            if( ctxPtr->frameRatePerSecTimesOneHundred != 0 ) {
+                frameDuration = av_rescale_q(100, (AVRational){1, ctxPtr->frameRatePerSecTimesOneHundred}, timeBase);
+            }
+            ctxPtr->ptsOffset = ctxPtr->ptsOffset + ctxPtr->lastPts + frameDuration - framePts;
+            if( ctxPtr->numDiscontinuities == 0 ) {
+                LOG(DEBUG_LEVEL_WARN, DBG_MPEG_FILE, "Timestamp discontinuity from %.3f to %.3f secs, continuing the timeline from the previous frame --- Suppressing Subsequent Warnings.",
+                    ctxPtr->lastPts * av_q2d(timeBase), framePts * av_q2d(timeBase));
+            }
+            ctxPtr->numDiscontinuities++;
+        }
+    }
+    ctxPtr->lastPts = framePts;
+}  // trackTimestamp()
 #endif

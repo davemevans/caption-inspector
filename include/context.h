@@ -129,6 +129,9 @@ typedef struct {
     uint8 buffer[BUFSIZE];
     uint32 len;
     int64 firstPts;
+    int64 lastPts;                              // previous frame, as decoded
+    int64 ptsOffset;                            // added to keep the timeline continuous
+    uint32 numDiscontinuities;
     uint32 ccCountMismatchErrors;
     uint32 numRejectedPackets;
 } MpegFileCtx;

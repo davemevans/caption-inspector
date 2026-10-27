@@ -257,12 +257,14 @@ uint8 NumAllocatedBuffers( void ) {
  |
  | DESCRIPTION:
  |    This method converts the PTS into our internal Caption Time Structure.
+ |    Hours count on past 23 rather than wrapping, so a long asset keeps its
+ |    timeline in order.
  -------------------------------------------------------------------------------*/
 void CaptionTimeFromPts( CaptionTime* captionTimePtr, int64 pts ) {
 
-    ASSERT(((pts / (1000*60*60)) / 24) == 0);
     ASSERT(pts >= 0);
-    captionTimePtr->hour = (uint8)((pts / (1000*60*60)) % 24);
+    int64 hours = pts / (1000*60*60);
+    captionTimePtr->hour = (uint8)((hours > 255) ? 255 : hours);
     captionTimePtr->minute = (uint8)((pts / (1000*60)) % 60);
     captionTimePtr->second = (uint8)((pts / 1000) % 60);
     captionTimePtr->millisecond = (uint16)(pts % 1000);

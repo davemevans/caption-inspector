@@ -36,6 +36,11 @@
 /*--                               Constants                                --*/
 /*----------------------------------------------------------------------------*/
 
+// A timestamp that goes backwards, or forwards by more than this, is a
+// discontinuity (a splice or encoder restart) rather than elapsed time. Ten
+// seconds is FFmpeg's own default (-dts_delta_threshold).
+#define MAX_TIMESTAMP_STEP_SECS                             10
+
 /*----------------------------------------------------------------------------*/
 /*--                              Structures                                --*/
 /*----------------------------------------------------------------------------*/

@@ -432,9 +432,10 @@ void utest__AddReader( TEST_SUITE_RECEIVED_ARGUMENTS ) {
  | TEST CASES:
  |    1) Valid Presentation Time Stamp.
  |    2) Smallest Presentation Time Stamp.
- |    3) Largest Valid Presentation Time Stamp.
- |    4) Largest Presentation Time Stamp.
- |    5) Negative Presentation Time Stamp.
+ |    3) Last millisecond of the first day.
+ |    4) Hours count on past 23 rather than wrapping.
+ |    5) Largest Presentation Time Stamp holds at the largest hour.
+ |    6) Negative Presentation Time Stamp.
  -------------------------------------------------------------------------------*/
 void utest__CaptionTimeFromPts( TEST_SUITE_RECEIVED_ARGUMENTS ) {
     TEST_INITIALIZE
@@ -459,7 +460,7 @@ void utest__CaptionTimeFromPts( TEST_SUITE_RECEIVED_ARGUMENTS ) {
     ASSERT_EQ(CAPTION_TIME_PTS_NUMBERING, captionTime.source);
     TEST_END
 
-    TEST_START("Test Case: CaptionTimeFromPts() - Largest Valid Presentation Time Stamp.");
+    TEST_START("Test Case: CaptionTimeFromPts() - Last Millisecond of the First Day.");
     CaptionTimeFromPts( &captionTime, 86399999 );
     ASSERT_EQ(86399999, (23 * (1000*60*60)) + (59 * (1000*60)) + (59 * 1000) + 999);
     ASSERT_EQ(59, captionTime.minute);
@@ -468,9 +469,17 @@ void utest__CaptionTimeFromPts( TEST_SUITE_RECEIVED_ARGUMENTS ) {
     ASSERT_EQ(CAPTION_TIME_PTS_NUMBERING, captionTime.source);
     TEST_END
 
+    TEST_START("Test Case: CaptionTimeFromPts() - Hours Past 23.");
+    CaptionTimeFromPts( &captionTime, 94000123 );
+    ASSERT_EQ(26, captionTime.hour);
+    ASSERT_EQ(6, captionTime.minute);
+    ASSERT_EQ(40, captionTime.second);
+    ASSERT_EQ(123, captionTime.millisecond);
+    TEST_END
+
     TEST_START("Test Case: CaptionTimeFromPts() - Largest Presentation Time Stamp.");
-    FATAL_ERROR_EXPECTED
     CaptionTimeFromPts( &captionTime, 0x7FFFFFFFFFFFFFFF );
+    ASSERT_EQ(255, captionTime.hour);
     TEST_END
 
     TEST_START("Test Case: CaptionTimeFromPts() - Negative Presentation Time Stamp.");
