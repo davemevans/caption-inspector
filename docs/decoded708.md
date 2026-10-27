@@ -5,10 +5,14 @@ Caption Inspector will output decoded CEA-708 as text with inline tags from the 
 Each Service of 708 captions that are found are written in their own file, regardless of whether or not there are full
 and valid captions associated with the specific service.
 
-Here is an example of a Decoded CEA-708 file that was produced by Caption Inspector, followed by a description of the
-different elements in the file.
+Here is an example from a Decoded CEA-708 file that was produced by Caption Inspector (service 1 of
+`test/media/BigBuckBunny_256x144-24fps.ts`), followed by a description of the different elements in the file.
 
-![Decoded CEA-708 File Image](./html/assets/content-images/Decoded708.png)
+```
+00:00:03,545 - {HDW:11111111}
+00:00:03,753 - {TGW:00000010}
+00:00:03,920 - {DLW:00000001} {DF0:PopUp-Cntrd:R1-C41:Anchor-UL-V65-H60:Pen-MonoSerif:Pr-0} {SWA:Fill-Transparent-R1G1B1:Brdr-None-R1G1B1:PD-LtoR:SD-LtoR:JD-LtoR:Snap-1.0sec-LtoR} {SPL:R0-C6} {SPA:Pen-[Size:Standard,Offset:Normal]:TextTag-Dialog:FontTag-Default:EdgeType-None} {SPC:FG-Solid-R2G2B2:BG-Solid-R0G0B0:Edg-R1G1B1} "I WIN," {SPL:R1-C0} "WE MOVE IN THERE."
+```
 
 Timestamp
 ---------
@@ -31,7 +35,15 @@ Text
 ----
 
 The text is merely wrapped in quotes, with all whitespaces preserved inside of the quotes. If there are quotes in
-the text, they will be printed out directly and will not be escaped out or anything like that.
+the text, they will be printed out directly and will not be escaped out or anything like that. The file is UTF-8.
+
+Characters from all four code sets are printed inside the quotes with the rest of the text: G0 (ASCII, with the music
+note `♩` at 0x7F), G1 (Latin-1, e.g. `É`), G2 (e.g. `…`, `™`, `Œ` and box-drawing characters, with the transparent space
+shown as a space) and G3 (the `[CC]` icon, shown as `㏄`).
+
+The C0 codes NUL, ETX, BS, FF, CR and HCR are shown inline by name, e.g. `{CR}`, although NUL and ETX can be left out
+within text. A 16-bit character sent with P16 is shown as its code, e.g. `{P16:0x0634}`, because the stream does not
+say which character set it is in. The reserved C2 and C3 codes are shown as `{C2Cmd}` and `{C3Cmd}`.
 
 Set Current Window
 ------------------

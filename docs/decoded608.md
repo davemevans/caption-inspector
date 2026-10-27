@@ -15,10 +15,20 @@ act on caption memory, so they stay in the caption file. On field 2 an XDS packe
 Field 2 caption control codes should use the first bytes 0x15/0x1D, but some encoders send the field 1 bytes 0x14/0x1C
 there too. The field decides the channel, so these are decoded as CC3/CC4, with a warning in the debug log.
 
-Here is an example of a Decoded CEA-608 file that was produced by Caption Inspector, followed by a description of the
-different elements in the file.
+XDS packets on field 2 are not captions, so they are left out of the `.608` files; the `.ccd` file shows them.
 
-![Decoded CEA-608 File Image](./html/assets/content-images/Decoded608.png)
+Here is an example from a Decoded CEA-608 file that was produced by Caption Inspector (CC1 of
+`test/media/BigBuckBunny_256x144-24fps.ts`), followed by a description of the different elements in the file.
+
+```
+00:00:00,291 - {RCL}
+00:00:00,333 - {RCL} {R14:C12} {R14:C12} "- 20." {R15:C4} {R15:C4} {TO2} "- THAT'S STRETCH"
+00:00:01,042 - {RCL}
+00:00:01,084 - {RCL}
+00:00:01,126 - {EDM}
+00:00:01,167 - {EDM}
+00:00:01,209 - {EOC}
+```
 
 Timestamp
 ---------
@@ -41,7 +51,7 @@ Text
 ----
 
 The text is merely wrapped in quotes, with all whitespaces preserved inside of the quotes. If there are quotes in
-the text, they will be printed out directly and will not be escaped out.
+the text, they will be printed out directly and will not be escaped out. The file is UTF-8.
 
 Special Characters (e.g. `♪`, `®`, and the transparent space shown as `☐`) and Extended Characters (e.g. `Á`, `ß`, `—`)
 are printed inside the quotes with the rest of the text. An Extended Character is sent after a fallback character
