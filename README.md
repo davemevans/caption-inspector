@@ -19,6 +19,9 @@ a [CEA-708 Decode File](./docs/decoded708.md), and a [Closed Caption Descriptor 
 * Decoding a SCC Caption file and writing the decoded captions into a MCC Caption File, a [CEA-608 Decode File](./docs/decoded608.md),
 and a [Closed Caption Descriptor Decode File](./docs/decodeCCD.md).
 
+The format of these files has changed since the last Comcast release; [CHANGELOG.md](./CHANGELOG.md) lists what
+changed.
+
 Building and Running the Caption Inspector Executable Locally
 -------------------------------------------------------------
 
